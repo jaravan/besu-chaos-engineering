@@ -26,15 +26,16 @@
 #   them. Tests the threshold: the wait persists only when >= f+1 validators stay
 #   stuck (N=4 -> f=1, so 1 stuck still recovers fast, 2 stuck waits it out).
 #
-# STEP selects which steps run: "1", "2", "3", "4", or "all" (default = 1 + 2;
-# "3"/"4" are opt-in since they restart validators).
+# STEP selects which steps run: "1", "2", "3", "4", or "default" (= steps 1 + 2,
+# the non-destructive observation pair). "3"/"4" are opt-in — they restart
+# validators — so they are never part of the default run; request them explicitly.
 set -euo pipefail
 # Run from the repo root so `source scripts/lib.sh` and the relative paths
 # resolve no matter where the script is invoked from.
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh
 
-STEP="${STEP:-all}"
+STEP="${STEP:-default}"
 TARGET_VALIDATOR="${TARGET_VALIDATOR:-2}"        # step 1: single target
 TARGET_VALIDATORS=(${TARGET_VALIDATORS:-2 3})    # step 2: the pair taken down
 OUTAGE_WINDOW="${OUTAGE_WINDOW:-30}"             # step 1b sustained outage
@@ -286,8 +287,8 @@ case "${STEP}" in
   2)   step_quorum_loss ;;
   3)   step_coordinated_restart ;;
   4)   step_partial_restart ;;
-  all) step_single_validator_loss; step_quorum_loss ;;
-  *)   fail "unknown STEP='${STEP}' (use 1, 2, 3, 4, or all)" ;;
+  default) step_single_validator_loss; step_quorum_loss ;;
+  *)   fail "unknown STEP='${STEP}' (use 1, 2, 3, 4, or default)" ;;
 esac
 
 log "=== scenario 01 complete ==="

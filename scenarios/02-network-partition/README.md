@@ -9,7 +9,7 @@ the BFT quorum of 2f+1 = 3.
 
 The name "split-brain" is borrowed from databases, where a partition can let two
 sides accept conflicting writes and diverge. **Besu's BFT engines cannot
-split-brain.** Block commitment requires a 2f+1 quorum *and* both QBFT and
+split-brain.** Block commitment requires a 2f+1 quorum _and_ both QBFT and
 IBFT 2.0 have immediate finality, so neither 2-validator side can commit a block.
 The expected outcome is therefore the same as quorum loss
 ([scenario 01, Step 2](../01-validator-loss/#step-2--quorum-loss-chain-halts)):
@@ -103,7 +103,7 @@ live peer (the IBFT 2.0 case below).
 - **Recovery on heal was automatic and fast: 10s** to the first block above the
   halt height after flushing the DROP rules — no pod restart, no manual
   intervention, no divergence. Fast because the partition was short (round only 2)
-  *and* healing reconnects four already-running, already-in-sync nodes — unlike
+  _and_ healing reconnects four already-running, already-in-sync nodes — unlike
   quorum loss, where recovery also waits for restarted validators to resync.
 
 **IBFT 2.0:**
@@ -126,7 +126,7 @@ live peer (the IBFT 2.0 case below).
   scenario 01 — meant the set waited out that timer and re-established the sparser
   mesh before committing. Still fully automatic, no restart, no divergence.
 
-**Consensus comparison.** The *invariants* are engine-independent: both halt at
+**Consensus comparison.** The _invariants_ are engine-independent: both halt at
 the last committed block, neither forks, both leave every pod `Running`/`Ready`,
 both show the round-change backoff, and both recover automatically on heal with no
 restart. The only difference was recovery latency (QBFT 10s vs IBFT 2.0 82s),
@@ -152,7 +152,7 @@ scenario 01 (peer-count alerts false-positive right after a topology change).
   flushing the rules (no restart) against recovery after recreating the pods, to
   separate "partition healed" from "nodes restarted."
 
-## Runbook entries fed by this scenario
+## Runbook entries backed by this scenario
 
 - [Chain halted, all pods Running/Ready, validators split (network
   partition)](../../runbook/03-chain-halted-network-partition.md).

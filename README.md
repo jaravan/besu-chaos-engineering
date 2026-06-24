@@ -82,7 +82,7 @@ causes, diagnosis steps, recovery procedure, prevention. An entry is added only
 after the corresponding scenario has been run and its recovery procedure
 verified, so the runbook stays grounded in observed behaviour rather than theory.
 
-| Entry                                                                           | Fed by scenario                                |
+| Entry                                                                           | Backed by scenario                             |
 | ------------------------------------------------------------------------------- | ---------------------------------------------- |
 | [Validator down, network healthy](runbook/01-validator-down-network-healthy.md) | [01](scenarios/01-validator-loss/) (Step 1)    |
 | [Chain halted, quorum loss](runbook/02-chain-halted-quorum-loss.md)             | [01](scenarios/01-validator-loss/) (Steps 2–4) |
