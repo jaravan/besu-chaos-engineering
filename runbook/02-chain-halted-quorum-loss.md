@@ -26,7 +26,9 @@ Ordered by frequency in practice:
    PodDisruptionBudget), or two validators co-scheduled on one failed node.
 2. **Network partition** splitting the validators so no side has quorum (each
    side has ≤ 2 of 4). Same symptom — frozen height, RPC alive — but the pods
-   are all `Running`. Distinguish by peer counts (see diagnosis).
+   are all `Running`. Distinguish by peer counts (see diagnosis); for the
+   dedicated procedure see
+   [chain halted, network partition](03-chain-halted-network-partition.md).
 3. **Cluster-wide misconfiguration** preventing consensus (e.g. severe clock
    skew across the set, or a bad config rollout) — rare, but presents the same
    way.

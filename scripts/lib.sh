@@ -69,6 +69,37 @@ cleanup_probe() {
   kubectl -n "${NAMESPACE}" delete pod "${PROBE_POD}" --ignore-not-found --wait=false --grace-period=1 >/dev/null 2>&1 || true
 }
 
+# --- network-namespace injection (scenario 02 — partition) -------------------
+# Besu containers ship without iptables or NET_ADMIN, so traffic rules are added
+# from a privileged ephemeral debug container that shares the target pod's netns.
+NETSHOOT_IMG="${NETSHOOT_IMG:-nicolaka/netshoot}"
+NETNS_CTR="${NETNS_CTR:-chaos-net}"
+
+# netns_container_running <pod> — prints the debug container's startedAt if up
+netns_container_running() {
+  kubectl -n "${NAMESPACE}" get pod "$1" \
+    -o jsonpath="{.status.ephemeralContainerStatuses[?(@.name=='${NETNS_CTR}')].state.running.startedAt}" 2>/dev/null
+}
+
+# ensure_netns_container <pod> — attach the netns container if absent, wait Ready
+ensure_netns_container() {
+  local pod="$1" i
+  if [[ -z "$(netns_container_running "${pod}")" ]]; then
+    kubectl -n "${NAMESPACE}" debug "pod/${pod}" --image="${NETSHOOT_IMG}" \
+      --profile=sysadmin -c "${NETNS_CTR}" -q -- sleep 3600 >/dev/null 2>&1 || true
+  fi
+  for i in $(seq 1 90); do
+    [[ -n "$(netns_container_running "${pod}")" ]] && return 0
+    sleep 2
+  done
+  fail "netns container ${NETNS_CTR} did not start in ${pod}"
+}
+
+# netns <pod> <sh-command> — run a command in the pod's netns (iptables, tc, …)
+netns() {
+  kubectl -n "${NAMESPACE}" exec "$1" -c "${NETNS_CTR}" -- sh -c "$2"
+}
+
 # rpc <method> <params-json> [host]  — host defaults to the unified RPC service
 rpc() {
   local method="$1" params="${2:-[]}" host="${3:-${UNIFIED_SVC}}"

@@ -44,8 +44,8 @@ working cluster and outbound image pulls; others need cluster _capabilities_ tha
 a locked-down managed cluster may not grant — properties of the cluster's policy,
 not of any one vendor. For example:
 
-- **Privileged ephemeral containers** — the planned network-partition and
-  slow-peer scenarios will attach a `NET_ADMIN` debug container (`kubectl debug --profile=sysadmin`) to shape traffic in a node's network namespace; a cluster with restrictive PodSecurity admission will reject this.
+- **Privileged ephemeral containers** — the network-partition scenario (and the
+  planned slow-peer scenario) attaches a `NET_ADMIN` debug container (`kubectl debug --profile=sysadmin`) to shape traffic in a node's network namespace; a cluster with restrictive PodSecurity admission will reject this.
 - **Public image egress** — scenarios pull `curlimages/curl`, and the traffic-shaping scenarios will add `nicolaka/netshoot`; air-gapped clusters need these mirrored.
 - **A working StorageClass** — the planned snapshot/restore scenarios will copy PVC volumes; behaviour depends on the cluster's storage provisioner.
 
@@ -70,9 +70,10 @@ Scenario numbers are stable IDs wired into the Makefile and the runbook.
 
 How a BFT validator set behaves as validators are lost, isolated, or degraded.
 
-| #                                  | Scenario       | Failure injected                                                                                                                                                    | Consensus       |
-| ---------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| [01](scenarios/01-validator-loss/) | Validator loss | Two steps along the fault threshold: one validator down (N-1, network stays healthy), then two down (f=1 exceeded → chain halts, RTO grows superlinearly with halt) | QBFT · IBFT 2.0 |
+| #                                     | Scenario          | Failure injected                                                                                                                                                                                              | Consensus       |
+| ------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| [01](scenarios/01-validator-loss/)    | Validator loss    | Two steps along the fault threshold: one validator down (N-1, network stays healthy), then two down (f=1 exceeded → chain halts, RTO grows superlinearly with halt)                                           | QBFT · IBFT 2.0 |
+| [02](scenarios/02-network-partition/) | Network partition | Split the validators `[1,2] \| [3,4]` with iptables DROP rules so neither side has quorum: both sides halt at the same block (no split-brain) while every pod stays Running/Ready; heal by flushing the rules | QBFT · IBFT 2.0 |
 
 ## Runbook
 
@@ -81,10 +82,11 @@ causes, diagnosis steps, recovery procedure, prevention. An entry is added only
 after the corresponding scenario has been run and its recovery procedure
 verified, so the runbook stays grounded in observed behaviour rather than theory.
 
-| Entry                                                                           | Fed by scenario                             |
-| ------------------------------------------------------------------------------- | ------------------------------------------- |
-| [Validator down, network healthy](runbook/01-validator-down-network-healthy.md) | [01](scenarios/01-validator-loss/) (Step 1) |
+| Entry                                                                           | Fed by scenario                                |
+| ------------------------------------------------------------------------------- | ---------------------------------------------- |
+| [Validator down, network healthy](runbook/01-validator-down-network-healthy.md) | [01](scenarios/01-validator-loss/) (Step 1)    |
 | [Chain halted, quorum loss](runbook/02-chain-halted-quorum-loss.md)             | [01](scenarios/01-validator-loss/) (Steps 2–4) |
+| [Chain halted, network partition](runbook/03-chain-halted-network-partition.md) | [02](scenarios/02-network-partition/)          |
 
 ## Safety
 
