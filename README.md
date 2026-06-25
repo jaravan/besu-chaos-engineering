@@ -66,6 +66,13 @@ contains a `README.md` (hypothesis, method, expected and observed behaviour) and
 a `run.sh` that executes the full inject → observe → recover → assert cycle.
 Scenario numbers are stable IDs wired into the Makefile and the runbook.
 
+> **Cross-cutting note — cold-start peering.** On chart ≤ 0.2.2 a fresh
+> simultaneous deploy could leave the validators in a sparse hub-and-spoke mesh
+> (`net_peerCount` `3/1/1/1`) even though every pod is `Running`/`Ready` and blocks
+> are flowing — a Kubernetes/P2P startup-timing artifact, independent of QBFT vs
+> IBFT 2.0. **Fixed in chart 0.2.3** (`publishNotReadyAddresses` on the validator
+> Services): fresh installs now cold-start to a full `3/3/3/3` mesh.
+
 ### Consensus & availability
 
 How a BFT validator set behaves as validators are lost, isolated, or degraded.
