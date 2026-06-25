@@ -2,7 +2,7 @@ KIND_CLUSTER ?= besu-chaos
 NAMESPACE    ?= besu
 RELEASE      ?= sbx
 CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
-CHART_VERSION ?= 0.2.2
+CHART_VERSION ?= 0.2.3
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
 .PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02
