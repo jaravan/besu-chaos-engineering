@@ -38,6 +38,18 @@ STEP=4 STUCK_SURVIVORS=1 HALT_WINDOW=300 make scenario-01  # partial restart / f
 
 ## Step 1 — Single validator loss (network healthy)
 
+```mermaid
+graph LR
+    v1[validator1]
+    v2[validator2]
+    v3[validator3]
+    v4["validator4 — down ✕"]:::down
+    v1 & v2 & v3 -->|"3 of 4 ≥ quorum 3"| ok(["✓ chain keeps advancing<br/>node rejoins and catches up"])
+    class ok good
+    classDef down fill:#fdd,stroke:#c00,color:#900
+    classDef good fill:#dfd,stroke:#270,color:#150
+```
+
 ### Hypothesis
 
 Losing one validator must not interrupt block production. A killed validator
@@ -112,6 +124,18 @@ deploy/restart will false-positive.**
 ---
 
 ## Step 2 — Quorum loss (chain halts)
+
+```mermaid
+graph LR
+    v1[validator1]
+    v2[validator2]
+    v3["validator3 — down ✕"]:::down
+    v4["validator4 — down ✕"]:::down
+    v1 & v2 -->|"2 of 4 &lt; quorum 3"| halt(["✕ chain HALTS<br/>round-change backoff grows"])
+    class halt stop
+    classDef down fill:#fdd,stroke:#c00,color:#900
+    classDef stop fill:#fee,stroke:#c00,color:#900
+```
 
 ### Hypothesis
 
