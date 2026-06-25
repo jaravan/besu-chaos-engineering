@@ -504,8 +504,8 @@ two don't surface under validator loss:
 
 - **Validator-set management.** QBFT supports both vote/header-based and
   smart-contract-based validator management; IBFT 2.0 is vote/header only. That's
-  the biggest functional gap — and it would show up in a validator-governance
-  scenario (planned, 08), not here.
+  the biggest functional gap, and it does not surface under validator loss — it
+  takes exercising validator governance to see it.
 - **Proposer-selection policy and message format.** QBFT is the newer engine,
   positioned as the recommended one going forward, with a more extensible message
   structure.
