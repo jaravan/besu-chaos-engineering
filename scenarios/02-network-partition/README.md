@@ -22,6 +22,22 @@ pods missing; here Kubernetes sees a fully healthy deployment while the network
 is dead. It is the strongest possible case for "alert on block-height-stall, not
 on pod health."
 
+```mermaid
+graph LR
+    subgraph SideA["Side A · 2 of 4 — no quorum"]
+        v1[validator1] --- v2[validator2]
+    end
+    subgraph SideB["Side B · 2 of 4 — no quorum"]
+        v3[validator3] --- v4[validator4]
+    end
+    probe(["chaos-probe"]) -. "RPC ✓" .-> v1 & v2 & v3 & v4
+    v1 -. "✕ DROP" .- v3
+    v2 -. "✕ DROP" .- v4
+```
+
+_Each side keeps its own pair but loses the other — 2 of 4 is below quorum, so both
+sides halt at the same block (no fork). RPC reaches every node throughout._
+
 ## Method
 
 Inject the partition with `iptables` `DROP` rules in the validator pods'
@@ -68,77 +84,68 @@ four validators.
 Both engines behaved exactly as hypothesised — the partition halted the chain at
 the last committed block with **no fork**, every pod stayed `Running`/`Ready`, and
 the network recovered automatically on heal with no pod restart and no divergence.
-Recorded on kind v0.32.0 (macOS/arm64, kubectl 1.36.1, chart 0.2.2, Besu 26.6.0,
-2s block period, `HALT_WINDOW=45`, split `[1,2] | [3,4]`). One run per engine —
-the absolute recovery seconds are timing-specific (they depend on where the heal
-lands in the current round timer); what transfers is the shape.
+Recorded on kind v0.32.0 (macOS/arm64, kubectl 1.36.1, **chart 0.2.3**, Besu
+26.6.0, 2s block period, `HALT_WINDOW=45`, split `[1,2] | [3,4]`). The absolute
+recovery seconds are timing-specific (they depend on where the heal lands in the
+current round timer); what transfers is the shape.
 
-| Engine   | Halt height | Sides agree (no fork) | Pods during halt | Peers v1/v2/v3/v4 | Max round | Recovery after heal |
-| -------- | ----------- | --------------------- | ---------------- | ----------------- | --------- | ------------------- |
-| QBFT     | 66          | yes (66 = 66)         | all 4 Running    | 1/1/1/1           | 2         | **10s**             |
-| IBFT 2.0 | 35          | yes (35 = 35)         | all 4 Running    | 1/1/0/0           | 2         | **82s**             |
+| Engine   | Baseline mesh  | Sides agree (no fork) | Pods during halt | Peers v1/v2/v3/v4 | Max round | Recovery after heal |
+| -------- | -------------- | --------------------- | ---------------- | ----------------- | --------- | ------------------- |
+| QBFT     | full `3/3/3/3` | yes (53 = 53)         | all 4 Running    | 1/1/1/1           | 2         | **10s**             |
+| IBFT 2.0 | full `3/3/3/3` | yes (7 = 7)           | all 4 Running    | 1/1/1/1           | 2         | **8s**              |
 
-The **Peers** column is each validator's `net_peerCount` during the halt, written
-in validator-number order `v1/v2/v3/v4`. So `1/1/0/0` means validator1 and
-validator2 each kept 1 peer while validator3 and validator4 had 0. A healthy
+Chart 0.2.3 cold-starts to a **full `3/3/3/3` mesh on both engines with no manual
+rolling** (it ships the `publishNotReadyAddresses` fix, below), so the partition
+runs from a real full mesh. The **Peers** column is each validator's
+`net_peerCount` during the halt, in validator-number order `v1/v2/v3/v4`. A healthy
 4-node mesh is 3 peers each; the `[1,2] | [3,4]` split caps every node at its one
-same-side partner (→ 1), and a node drops to 0 when even that partner was never a
-live peer (the IBFT 2.0 case below).
+same-side partner, so all four read **`1/1/1/1`** — each side an isolated, still-
+connected pair.
 
 **QBFT:**
 
-- **Halts, does not split-brain.** With `[1,2] | [3,4]` partitioned the chain
-  froze at block 66 for the full 45s window; both sides reported the **same**
-  height (66) throughout and RPC answered on every node — no fork, nothing to
-  reconcile.
+- **Halts, does not split-brain.** With `[1,2] | [3,4]` partitioned the chain froze
+  for the full 45s window; both sides reported the **same** height (53) throughout
+  and RPC answered on every node — no fork, nothing to reconcile.
 - **All four pods stayed `Running`.** Kubernetes saw a fully healthy deployment
   while the network was dead. Peer counts collapsed to **1 on every validator**
-  (each saw only its same-side partner) as the cross-partition RLPx connections
-  timed out — pod health never changed.
-- **Round-change backoff visible in the logs**, the same mechanism as quorum
-  loss: `RoundTimer | Moved to round 2 which will expire in 40 seconds` and
+  (`1/1/1/1` — each kept only its same-side partner) as the cross-partition RLPx
+  connections timed out; pod health never changed.
+- **Round-change backoff visible in the logs**, the same mechanism as quorum loss:
+  `RoundTimer | Moved to round 2 which will expire in 40 seconds` and
   `RoundChangeManager | BFT round summary (quorum = 3)` on the side-A validators
-  while they proposed without ever reaching quorum (round climbed to 2 over the
-  ~57s partition).
+  while they proposed without ever reaching quorum (round climbed to 2).
 - **Recovery on heal was automatic and fast: 10s** to the first block above the
   halt height after flushing the DROP rules — no pod restart, no manual
-  intervention, no divergence. Fast because the partition was short (round only 2)
-  _and_ healing reconnects four already-running, already-in-sync nodes — unlike
-  quorum loss, where recovery also waits for restarted validators to resync.
+  intervention, no divergence. Fast because healing reconnects four already-running,
+  already-in-sync nodes — unlike quorum loss, where recovery also waits for
+  restarted validators to resync.
 
 **IBFT 2.0:**
 
-- **Identical invariants — halt, no fork, pods all `Running`.** Chain froze at
-  block 35 for the full window; both sides stayed at 35 with RPC alive; round
+- **Identical invariants — halt, no fork, pods all `Running`.** The chain froze for
+  the full window; both sides stayed at the same height (7) with RPC alive; round
   climbed to 2 (`Moved to round 2 which will expire in 40 seconds`).
-- **Peer collapse was 1/1/0/0, not 1/1/1/1** — i.e. validator1 = 1 peer,
-  validator2 = 1, validator3 = 0, validator4 = 0. Side B (validators 3, 4) dropped
-  to **0** peers rather than 1. This is the IBFT 2.0 cold-start peering lag scenario
-  01 documents: at baseline the mesh had not fully formed (validators 2–4 each had
-  only 1 peer, all pointing at validator1), so once validator1 was partitioned
-  away, the side-B pair had no surviving link to fall back on. The collapse is
-  still symmetric in effect (each side isolated), just starting from a sparser
-  mesh.
-- **Recovery on heal was slower: 82s** vs QBFT's 10s, though both climbed only to
-  round 2. The gap is timing plus engine cadence: the heal landed early in a fresh
-  40s round-2 timer (two round-2 entries logged, the second ~7s before heal), and
-  IBFT 2.0's slower proposer/round-change startup — the same tendency seen in
-  scenario 01 — meant the set waited out that timer and re-established the sparser
-  mesh before committing. Still fully automatic, no restart, no divergence.
+- **Peer collapse was `1/1/1/1`**, same as QBFT — from a full baseline mesh each
+  validator kept exactly its same-side partner.
+- **Recovery on heal was 8s** — comparable to QBFT's 10s. From a full mesh neither
+  engine has to re-form peers on heal, so recovery is fast on both; the small gap is
+  just where the heal lands in the round timer.
 
-**Consensus comparison.** The _invariants_ are engine-independent: both halt at
-the last committed block, neither forks, both leave every pod `Running`/`Ready`,
-both show the round-change backoff, and both recover automatically on heal with no
-restart. The only difference was recovery latency (QBFT 10s vs IBFT 2.0 82s),
-which tracks IBFT 2.0's slower round-change/proposer startup and a less-settled
-peer mesh — consistent with scenario 01, and not a different recovery behaviour.
-As in quorum loss, a longer partition would climb to higher rounds and inherit the
-same superlinear backoff curve scenario 01 measured.
+**Consensus comparison.** The behaviour is engine-independent: both halt at the last
+committed block, neither forks, both leave every pod `Running`/`Ready`, both show the
+round-change backoff, and both recover automatically on heal (10s / 8s) with no
+restart. As in quorum loss, a longer partition would climb to higher rounds and
+inherit the same superlinear backoff curve scenario 01 measured.
 
-**Peer-mesh lag on heal** reproduced on both engines: validators re-established the
-full mesh over the following minutes (some nodes still at 1 peer immediately after
-recovery while others climbed back to 2–3) — the same monitoring caveat as
-scenario 01 (peer-count alerts false-positive right after a topology change).
+**Note (chart ≤ 0.2.2).** A cold-start peering race could leave a sparse `3/1/1/1`
+baseline mesh, making the partition read `1/1/0/0` instead of `1/1/1/1` — a
+Kubernetes/P2P timing artifact (not consensus), fixed in 0.2.3 via
+`publishNotReadyAddresses` on the validator Services.
+
+**Peer mesh on heal.** On 0.2.3 the mesh returned to a full `3/3/3/3` on both engines
+within the post-recovery check (~12s after heal). Treat peer count as a topology
+signal, not a liveness one.
 
 ## Variations
 
