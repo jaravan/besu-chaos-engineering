@@ -69,9 +69,10 @@ cleanup_probe() {
   kubectl -n "${NAMESPACE}" delete pod "${PROBE_POD}" --ignore-not-found --wait=false --grace-period=1 >/dev/null 2>&1 || true
 }
 
-# --- network-namespace injection (scenario 02 — partition) -------------------
-# Besu containers ship without iptables or NET_ADMIN, so traffic rules are added
-# from a privileged ephemeral debug container that shares the target pod's netns.
+# --- network-namespace injection (scenario 02 partition, 03 slow-peer) --------
+# Besu containers ship without iptables/tc or NET_ADMIN, so traffic rules are
+# added from a privileged ephemeral debug container that shares the target pod's
+# netns (scenario 02 uses iptables, scenario 03 uses tc netem).
 NETSHOOT_IMG="${NETSHOOT_IMG:-nicolaka/netshoot}"
 NETNS_CTR="${NETNS_CTR:-chaos-net}"
 

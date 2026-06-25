@@ -5,7 +5,7 @@ CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
 CHART_VERSION ?= 0.2.3
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
-.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02
+.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03
 
 cluster-up:
 	kind get clusters | grep -qx $(KIND_CLUSTER) || kind create cluster --name $(KIND_CLUSTER)
@@ -39,3 +39,13 @@ scenario-01:
 # the deployed release (qbft | ibft2).
 scenario-02:
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/02-network-partition/run.sh
+
+# Scenario 03 — slow peer (network degradation). Degrades one validator's egress
+# with tc netem in escalating steps (400ms; 800ms+25% loss; 12s past the
+# round-change timeout), injected via the same privileged ephemeral debug
+# container as scenario 02. The chain keeps producing on 3-of-4; once latency
+# crosses requesttimeoutseconds the slow node's proposer slots round-change.
+# TARGET_VALIDATOR overrides the degraded node. CONSENSUS must match the deployed
+# release (qbft | ibft2).
+scenario-03:
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/03-slow-peer/run.sh
