@@ -5,7 +5,7 @@ CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
 CHART_VERSION ?= 0.2.3
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
-.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03
+.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04
 
 cluster-up:
 	kind get clusters | grep -qx $(KIND_CLUSTER) || kind create cluster --name $(KIND_CLUSTER)
@@ -13,9 +13,13 @@ cluster-up:
 cluster-down:
 	kind delete cluster --name $(KIND_CLUSTER)
 
+# EPOCHLENGTH (optional) overrides the QBFT/IBFT epoch length in the generated
+# genesis — e.g. EPOCHLENGTH=30 for the scenario-04 epoch test. Genesis is
+# immutable, so changing it means a fresh chain (uninstall + delete PVCs first).
 install:
 	helm upgrade --install $(RELEASE) $(CHART) --version $(CHART_VERSION) \
 		--set consensus=$(CONSENSUS) \
+		$(if $(EPOCHLENGTH),--set consensusConfig.epochlength=$(EPOCHLENGTH),) \
 		-n $(NAMESPACE) --create-namespace --wait --timeout 600s
 
 uninstall:
@@ -49,3 +53,12 @@ scenario-02:
 # release (qbft | ibft2).
 scenario-03:
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/03-slow-peer/run.sh
+
+# Scenario 04 — validator-set governance. The existing validators vote a member
+# out of the set and back in at runtime via <engine>_proposeValidatorVote — no
+# restart, no genesis/chart change. The chain keeps producing at N=3 (quorum 2)
+# while the member is out; the durable counterpart to the transient loss in
+# scenario 01. VOTERS overrides the voting majority. CONSENSUS must match the
+# deployed release (qbft | ibft2).
+scenario-04:
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/04-validator-governance/run.sh

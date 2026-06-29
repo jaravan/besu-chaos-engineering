@@ -74,13 +74,15 @@ Scenario numbers are stable IDs wired into the Makefile and the runbook.
 
 ### Consensus & availability
 
-How a BFT validator set behaves as validators are lost, isolated, or degraded.
+How a BFT validator set behaves as validators are lost, isolated, degraded, or
+deliberately reconfigured.
 
-| #                                     | Scenario          | Failure injected                                                                                                                                                                                                                                                                                        | Consensus       |
-| ------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
-| [01](scenarios/01-validator-loss/)    | Validator loss    | Two steps along the fault threshold: one validator down (N-1, network stays healthy), then two down (f=1 exceeded → chain halts, RTO grows superlinearly with halt)                                                                                                                                     | QBFT · IBFT 2.0 |
-| [02](scenarios/02-network-partition/) | Network partition | Split the validators `[1,2] \| [3,4]` with iptables DROP rules so neither side has quorum: both sides halt at the same block (no split-brain) while every pod stays Running/Ready; heal by flushing the rules                                                                                           | QBFT · IBFT 2.0 |
-| [03](scenarios/03-slow-peer/)         | Slow peer         | Degrade one validator's egress with `tc netem` (400ms; 800ms+25% loss; 12s past the round-change timeout). Chain keeps producing on 3-of-4, but past `requesttimeoutseconds` the slow node's proposer slots round-change — a silent degradation that leaves zero fault tolerance, every pod still Ready | QBFT · IBFT 2.0 |
+| #                                        | Scenario             | Failure injected                                                                                                                                                                                                                                                                                                                         | Consensus       |
+| ---------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| [01](scenarios/01-validator-loss/)       | Validator loss       | Two steps along the fault threshold: one validator down (N-1, network stays healthy), then two down (f=1 exceeded → chain halts, RTO grows superlinearly with halt)                                                                                                                                                                      | QBFT · IBFT 2.0 |
+| [02](scenarios/02-network-partition/)    | Network partition    | Split the validators `[1,2] \| [3,4]` with iptables DROP rules so neither side has quorum: both sides halt at the same block (no split-brain) while every pod stays Running/Ready; heal by flushing the rules                                                                                                                            | QBFT · IBFT 2.0 |
+| [03](scenarios/03-slow-peer/)            | Slow peer            | Degrade one validator's egress with `tc netem` (400ms; 800ms+25% loss; 12s past the round-change timeout). Chain keeps producing on 3-of-4, but past `requesttimeoutseconds` the slow node's proposer slots round-change — a silent degradation that leaves zero fault tolerance, every pod still Ready                                  | QBFT · IBFT 2.0 |
+| [04](scenarios/04-validator-governance/) | Validator governance | Vote a member out of the validator set and back in at runtime via `<engine>_proposeValidatorVote` (majority of current validators, no restart, no genesis change). Chain keeps producing at N=3 while the member is out; the removed node stays Running as a non-proposing peer. The durable counterpart to scenario 01's transient loss | QBFT · IBFT 2.0 |
 
 ## Runbook
 
@@ -95,6 +97,7 @@ verified, so the runbook stays grounded in observed behaviour rather than theory
 | [Chain halted, quorum loss](runbook/02-chain-halted-quorum-loss.md)                     | [01](scenarios/01-validator-loss/) (Steps 2–4) |
 | [Chain halted, network partition](runbook/03-chain-halted-network-partition.md)         | [02](scenarios/02-network-partition/)          |
 | [Erratic block times, slow validator](runbook/04-erratic-block-times-slow-validator.md) | [03](scenarios/03-slow-peer/)                  |
+| [Changing the validator set](runbook/05-validator-set-governance.md)                    | [04](scenarios/04-validator-governance/)       |
 
 ## Safety
 
@@ -103,3 +106,13 @@ networks. As a guardrail the scripts refuse to run unless the current kubectl
 context looks like a local/disposable cluster — `kind-*`, `minikube`, `k3d-*`,
 `k3s`, or `docker-desktop`. Any other context (including a managed cluster)
 requires `ALLOW_ANY_CONTEXT=1` to run, at your own risk.
+
+> **`ALLOW_ANY_CONTEXT`** It is not a Kubernetes or Helm setting — it's an
+> environment-variable escape hatch defined by this repo's own guard
+> (`guard_local_context` in [`scripts/lib.sh`](scripts/lib.sh)). The guard reads
+> your current kubectl context and, if it isn't one of the recognised local
+> prefixes above, aborts the run. Setting `ALLOW_ANY_CONTEXT=1` tells the guard to
+> skip that check and proceed against whatever context is active. Use it only when
+> you have _deliberately_ pointed kubectl at a cluster you are certain is safe to
+> break — pass it per-invocation so it never lingers, e.g.
+> `ALLOW_ANY_CONTEXT=1 make scenario-01`.
