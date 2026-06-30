@@ -5,7 +5,7 @@ CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
 CHART_VERSION ?= 0.2.3
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
-.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04
+.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05
 
 cluster-up:
 	kind get clusters | grep -qx $(KIND_CLUSTER) || kind create cluster --name $(KIND_CLUSTER)
@@ -62,3 +62,15 @@ scenario-03:
 # deployed release (qbft | ibft2).
 scenario-04:
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/04-validator-governance/run.sh
+
+# Scenario 05 — duplicate validator key (HA failover gone wrong). A second node
+# runs the same validator key. STEP=1 (devp2p dedupe: copy deployed alongside the
+# live node) and STEP=2 (partition trap: real node isolated first, then the copy)
+# run by default; the copy is shut out at the P2P layer (0 peers / block 0) in both
+# — a deployment-level safety property, not a consensus guarantee (see the README
+# caveat). STEP=3 (opt-in, not in the default) scales the validator StatefulSet to 2:
+# the replica still can't join consensus, but its readiness probe admits it to the
+# RPC Service endpoints un-synced, polluting client reads. TARGET overrides the
+# duplicated validator. CONSENSUS must match the deployed release (qbft | ibft2).
+scenario-05:
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/05-duplicate-validator/run.sh
