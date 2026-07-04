@@ -2,9 +2,7 @@
 
 > Backed by scenario: [`01-validator-loss`](../scenarios/01-validator-loss/)
 > (Step 2 — halt + automatic recovery; Step 3 — coordinated-restart recovery;
-> Step 4 — how much of the set must be restarted, the f+1 threshold) — entries are
-> added only after the recovery procedure has been executed and verified against a
-> real network.
+> Step 4 — how much of the set must be restarted, the f+1 threshold).
 
 ## Symptom
 

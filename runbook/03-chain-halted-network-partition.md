@@ -1,8 +1,6 @@
 # Chain halted, all pods Running/Ready, validators split (network partition)
 
-> Backed by scenario: [`02-network-partition`](../scenarios/02-network-partition/)
-> — entries are added only after the recovery procedure has been executed and
-> verified against a real network.
+> Backed by scenario: [`02-network-partition`](../scenarios/02-network-partition/).
 
 ## Symptom
 

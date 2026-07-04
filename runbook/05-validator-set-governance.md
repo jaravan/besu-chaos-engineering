@@ -1,8 +1,7 @@
 # Changing the validator set (offboard / onboard a member)
 
-> Backed by scenario: [`04-validator-governance`](../scenarios/04-validator-governance/)
-> — entries are added only after the procedure has been executed and verified
-> against a real network. Verified on **both QBFT and IBFT 2.0**:
+> Backed by scenario: [`04-validator-governance`](../scenarios/04-validator-governance/).
+> Verified on **both QBFT and IBFT 2.0**:
 > a majority vote removed a validator in ~9s and re-added it in ~6s, no restart and
 > no pause in block production; a standing proposal proved **in-memory only** —
 > dropped on a node restart, but **not** expired by the epoch boundary. The

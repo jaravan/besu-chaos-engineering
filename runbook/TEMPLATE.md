@@ -1,8 +1,7 @@
 # <Failure mode title>
 
-> Backed by scenario: [`NN-scenario-name`](../scenarios/NN-scenario-name/) —
-> entries are added only after the recovery procedure has been executed and
-> verified against a real network.
+> Backed by scenario: [`NN-scenario-name`](../scenarios/NN-scenario-name/).
+> Verified on <chart / engine>: <one-line summary of the observed result>.
 
 ## Symptom
 

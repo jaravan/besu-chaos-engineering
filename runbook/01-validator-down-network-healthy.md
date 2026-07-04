@@ -1,9 +1,6 @@
 # Validator down, network healthy (false-positive alert storm)
 
-> Backed by scenario:
-> [`01-validator-loss`](../scenarios/01-validator-loss/) (Step 1) — entries are
-> added only after the recovery procedure has been executed and verified against
-> a real network.
+> Backed by scenario: [`01-validator-loss`](../scenarios/01-validator-loss/) (Step 1).
 
 ## Symptom
 
