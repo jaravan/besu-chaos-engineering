@@ -5,7 +5,7 @@ CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
 CHART_VERSION ?= 0.3.1
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
-.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05 scenario-06 scenario-07 scenario-08
+.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05 scenario-06 scenario-07 scenario-08 scenario-09
 
 cluster-up:
 	kind get clusters | grep -qx $(KIND_CLUSTER) || kind create cluster --name $(KIND_CLUSTER)
@@ -106,3 +106,14 @@ scenario-07:
 # perm_addAccountsToAllowlist (RPC escape hatch), no restart. Self-contained.
 scenario-08:
 	CHART=$(CHART) CHART_VERSION=$(CHART_VERSION) bash scenarios/08-permissioning-outage/run.sh
+
+# Scenario 09 — snapshot restore (storage layer). Restores a validator from a
+# data-volume snapshot three ways: STEP=1 cold (node stopped — crash-consistent,
+# the procedure to rely on), STEP=2 hot while idle (usually reopens via RocksDB
+# WAL recovery), STEP=3 hot under sustained tx load (a file-walk copy is a
+# smeared capture — the arm that can fail; a failed open triggers the runbook's
+# wipe+resync recovery automatically). All three by default. The target (default
+# validator4, TARGET_VALIDATOR overrides) is beyond quorum, so the chain keeps
+# producing at 3-of-4 throughout. Engine-independent (storage layer).
+scenario-09:
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) bash scenarios/09-snapshot-restore/run.sh

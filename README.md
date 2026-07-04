@@ -97,6 +97,16 @@ validator set.
 | [07](scenarios/07-account-permissioning/) | Account permissioning     | Spin up its own permissioned network and show a funded-but-not-allowlisted sender is DENIED at submission (`-32007`, never pooled, nonce unmoved) — the opposite shape to 06's accepted-then-stranded balance gate. `perm_addAccountsToAllowlist` on every validator lets it mine; removing it denies again. The two gates a new participant must clear: allowlisted **and** funded                                                        | Any (tx-layer) |
 | [08](scenarios/08-permissioning-outage/)  | Permissioning outage      | Empty the allowlist on every validator (a wrong admin change / bad deploy) and watch **every** sender get `-32007` while QBFT keeps producing empty blocks — pods Ready, height climbing, network frozen for users. The authorization-layer false comfort, worse than quorum loss because the chain doesn't even halt. Recover via the `perm_*` RPC escape hatch, no restart                                                               | Any (tx-layer) |
 
+### State & storage
+
+Whether a node can be rebuilt from what's on disk — and which backups deserve
+the trust. These scenarios operate on one node's data volume; consensus stays
+healthy throughout (the target is beyond quorum).
+
+| #                                    | Scenario         | Failure injected                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Consensus           |
+| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| [09](scenarios/09-snapshot-restore/) | Snapshot restore | Restore a validator from a data-volume snapshot, three ways: cold (node stopped — crash-consistent by construction, the procedure to rely on), hot while idle (usually reopens via RocksDB WAL recovery), and hot under sustained tx load (a file-walk copy is a _smeared_ capture that can fail to reopen). A failed hot restore triggers the runbook recovery — wipe + resync — automatically, so the loop closes either way. Also retires the GoQuorum "freezer desync" fear: Bonsai is one RocksDB, no two-store split | Any (storage-layer) |
+
 ## Runbook
 
 [runbook/](runbook/) holds incident entries in a fixed format — symptom, likely
@@ -114,6 +124,7 @@ verified, so the runbook stays grounded in observed behaviour rather than theory
 | [Transactions rejected or stuck pending](runbook/06-transactions-rejected-or-stuck-pending.md) | [06](scenarios/06-txpool-flooding/)            |
 | [Account not authorized to send](runbook/07-account-not-authorized-to-send.md)                 | [07](scenarios/07-account-permissioning/)      |
 | [Network "up" but no transactions](runbook/08-network-up-but-no-transactions.md)               | [08](scenarios/08-permissioning-outage/)       |
+| [Restoring a node from a volume snapshot](runbook/09-node-restore-from-volume-snapshot.md)     | [09](scenarios/09-snapshot-restore/)           |
 
 ## Safety
 
