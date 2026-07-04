@@ -2,10 +2,10 @@ KIND_CLUSTER ?= besu-chaos
 NAMESPACE    ?= besu
 RELEASE      ?= sbx
 CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
-CHART_VERSION ?= 0.2.3
+CHART_VERSION ?= 0.3.1
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
-.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05
+.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05 scenario-06 scenario-07 scenario-08
 
 cluster-up:
 	kind get clusters | grep -qx $(KIND_CLUSTER) || kind create cluster --name $(KIND_CLUSTER)
@@ -20,7 +20,13 @@ install:
 	helm upgrade --install $(RELEASE) $(CHART) --version $(CHART_VERSION) \
 		--set consensus=$(CONSENSUS) \
 		$(if $(EPOCHLENGTH),--set consensusConfig.epochlength=$(EPOCHLENGTH),) \
-		-n $(NAMESPACE) --create-namespace --wait --timeout 600s
+		-n $(NAMESPACE) --create-namespace --timeout 900s
+	# chart 0.3.x validator StatefulSets use updateStrategy=OnDelete, which helm
+	# --wait does not gate (and config-change upgrades roll one-at-a-time via a
+	# post-upgrade hook, needing the generous timeout above). Wait on pod readiness
+	# explicitly, per the chart NOTES.
+	kubectl -n $(NAMESPACE) wait --for=condition=Ready pod \
+		-l app.kubernetes.io/instance=$(RELEASE),app.kubernetes.io/component=validator --timeout=300s
 
 uninstall:
 	helm uninstall $(RELEASE) -n $(NAMESPACE)
@@ -74,3 +80,29 @@ scenario-04:
 # duplicated validator. CONSENSUS must match the deployed release (qbft | ibft2).
 scenario-05:
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/05-duplicate-validator/run.sh
+
+# Scenario 06 — transaction pool flooding. Drives `cast` (foundry) from a pod
+# against the unified RPC, signing with a genesis-funded dev account. Saturates a
+# sender's future-nonce queue until Besu rejects with an error (not a silent
+# drop), fills the gap to promote the queue, and shows a zero-balance sender's tx
+# is accepted but unmined until the account holds any balance. Consensus-agnostic
+# (tx-layer); runs against the main network. MAX_SUBMIT caps the future-nonce loop.
+scenario-06:
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) bash scenarios/06-txpool-flooding/run.sh
+
+# Scenario 07 — account permissioning. Stands up its OWN permissioned network
+# (namespace besu-perm, release sbxperm) with permissioning.accounts.enabled, then
+# shows a funded-but-not-allowlisted sender is DENIED at submission (-32007),
+# allowlisting it (perm_addAccountsToAllowlist on every validator) lets it mine,
+# and removing it denies again. Consensus-agnostic; self-contained (installs and
+# tears down its own network — KEEP_NETWORK=1 to inspect). Chart pin from the repo.
+scenario-07:
+	CHART=$(CHART) CHART_VERSION=$(CHART_VERSION) bash scenarios/07-account-permissioning/run.sh
+
+# Scenario 08 — permissioning outage (allowlist lockout). Same own-network install
+# as 07, then removes the OPERATIONAL account from the allowlist on every validator:
+# every sender is locked out (-32007) while QBFT keeps producing empty blocks — the
+# "network looks healthy but is frozen for users" trap. Recovers via
+# perm_addAccountsToAllowlist (RPC escape hatch), no restart. Self-contained.
+scenario-08:
+	CHART=$(CHART) CHART_VERSION=$(CHART_VERSION) bash scenarios/08-permissioning-outage/run.sh

@@ -69,6 +69,29 @@ cleanup_probe() {
   kubectl -n "${NAMESPACE}" delete pod "${PROBE_POD}" --ignore-not-found --wait=false --grace-period=1 >/dev/null 2>&1 || true
 }
 
+# --- transaction signing (scenarios 06 txpool, 07/08 permissioning) -----------
+# A long-lived foundry pod so each `cast` call is an exec, not a pod cold-start —
+# the tx-layer counterpart to the curl probe. Runs in ${NAMESPACE}, so a scenario
+# that targets its own network just exports NAMESPACE before sourcing this lib.
+CASTER_POD="${CASTER_POD:-chaos-caster}"
+FOUNDRY_IMG="${FOUNDRY_IMG:-ghcr.io/foundry-rs/foundry:latest}"
+
+ensure_caster() {
+  if ! kubectl -n "${NAMESPACE}" get pod "${CASTER_POD}" >/dev/null 2>&1; then
+    log "starting caster pod ${CASTER_POD} (${FOUNDRY_IMG})"
+    kubectl -n "${NAMESPACE}" run "${CASTER_POD}" --image="${FOUNDRY_IMG}" \
+      --restart=Never --command -- sleep 1800 >/dev/null
+  fi
+  kubectl -n "${NAMESPACE}" wait --for=condition=Ready "pod/${CASTER_POD}" --timeout=240s >/dev/null
+}
+
+cleanup_caster() {
+  kubectl -n "${NAMESPACE}" delete pod "${CASTER_POD}" --ignore-not-found --wait=false --grace-period=1 >/dev/null 2>&1 || true
+}
+
+# cast_in <sh-command> — run a shell snippet (cast …) inside the caster pod
+cast_in() { kubectl -n "${NAMESPACE}" exec "${CASTER_POD}" -- sh -c "$1"; }
+
 # --- network-namespace injection (scenario 02 partition, 03 slow-peer) --------
 # Besu containers ship without iptables/tc or NET_ADMIN, so traffic rules are
 # added from a privileged ephemeral debug container that shares the target pod's

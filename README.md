@@ -85,6 +85,18 @@ deliberately reconfigured.
 | [04](scenarios/04-validator-governance/) | Validator governance    | Vote a member out of the validator set and back in at runtime via `<engine>_proposeValidatorVote` (majority of current validators, no restart, no genesis change). Chain keeps producing at N=3 while the member is out; the removed node stays Running as a non-proposing peer. The durable counterpart to scenario 01's transient loss                                                                                                                                                                                                                                                                                       | QBFT · IBFT 2.0 |
 | [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | Run a second node carrying the same validator key (misconfigured HA failover). Deploy the duplicate alongside the live node (devp2p identity dedupe shuts it out), then isolate the real node first and try again (StatefulSet DNS still anchors peers to the real pod); an opt-in third step scales the validator StatefulSet to 2. The duplicate never joins consensus — 0 peers, block 0 — a deployment-level safety property, not a protocol guarantee against equivocation; a StatefulSet-scaled copy does, though, slip into the RPC Service endpoints un-synced and pollute client reads. No incident, no runbook entry | QBFT · IBFT 2.0 |
 
+### Transaction layer
+
+What gates, strands, or rejects a transaction while consensus stays healthy. These
+scenarios are engine-agnostic — they exercise the transaction pipeline, not the
+validator set.
+
+| #                                         | Scenario                  | Failure injected                                                                                                                                                                                                                                                                                                                                                                                                                           | Consensus      |
+| ----------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
+| [06](scenarios/06-txpool-flooding/)       | Transaction pool flooding | Saturate one sender's future-nonce queue (gap at the current nonce) until Besu rejects with `-32000` (not a silent drop), then fill the gap and watch the 199 queued txs promote and mine. A zero-balance sender's tx is accepted but never mined until the account holds any balance (1 wei is enough) — on a free-gas chain it's the empty account, not the gas price, that strands it. Reads and block production unaffected throughout | Any (tx-layer) |
+| [07](scenarios/07-account-permissioning/) | Account permissioning     | Spin up its own permissioned network and show a funded-but-not-allowlisted sender is DENIED at submission (`-32007`, never pooled, nonce unmoved) — the opposite shape to 06's accepted-then-stranded balance gate. `perm_addAccountsToAllowlist` on every validator lets it mine; removing it denies again. The two gates a new participant must clear: allowlisted **and** funded                                                        | Any (tx-layer) |
+| [08](scenarios/08-permissioning-outage/)  | Permissioning outage      | Empty the allowlist on every validator (a wrong admin change / bad deploy) and watch **every** sender get `-32007` while QBFT keeps producing empty blocks — pods Ready, height climbing, network frozen for users. The authorization-layer false comfort, worse than quorum loss because the chain doesn't even halt. Recover via the `perm_*` RPC escape hatch, no restart                                                               | Any (tx-layer) |
+
 ## Runbook
 
 [runbook/](runbook/) holds incident entries in a fixed format — symptom, likely
@@ -92,13 +104,16 @@ causes, diagnosis steps, recovery procedure, prevention. An entry is added only
 after the corresponding scenario has been run and its recovery procedure
 verified, so the runbook stays grounded in observed behaviour rather than theory.
 
-| Entry                                                                                   | Backed by scenario                             |
-| --------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| [Validator down, network healthy](runbook/01-validator-down-network-healthy.md)         | [01](scenarios/01-validator-loss/) (Step 1)    |
-| [Chain halted, quorum loss](runbook/02-chain-halted-quorum-loss.md)                     | [01](scenarios/01-validator-loss/) (Steps 2–4) |
-| [Chain halted, network partition](runbook/03-chain-halted-network-partition.md)         | [02](scenarios/02-network-partition/)          |
-| [Erratic block times, slow validator](runbook/04-erratic-block-times-slow-validator.md) | [03](scenarios/03-slow-peer/)                  |
-| [Changing the validator set](runbook/05-validator-set-governance.md)                    | [04](scenarios/04-validator-governance/)       |
+| Entry                                                                                          | Backed by scenario                             |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| [Validator down, network healthy](runbook/01-validator-down-network-healthy.md)                | [01](scenarios/01-validator-loss/) (Step 1)    |
+| [Chain halted, quorum loss](runbook/02-chain-halted-quorum-loss.md)                            | [01](scenarios/01-validator-loss/) (Steps 2–4) |
+| [Chain halted, network partition](runbook/03-chain-halted-network-partition.md)                | [02](scenarios/02-network-partition/)          |
+| [Erratic block times, slow validator](runbook/04-erratic-block-times-slow-validator.md)        | [03](scenarios/03-slow-peer/)                  |
+| [Changing the validator set](runbook/05-validator-set-governance.md)                           | [04](scenarios/04-validator-governance/)       |
+| [Transactions rejected or stuck pending](runbook/06-transactions-rejected-or-stuck-pending.md) | [06](scenarios/06-txpool-flooding/)            |
+| [Account not authorized to send](runbook/07-account-not-authorized-to-send.md)                 | [07](scenarios/07-account-permissioning/)      |
+| [Network "up" but no transactions](runbook/08-network-up-but-no-transactions.md)               | [08](scenarios/08-permissioning-outage/)       |
 
 ## Safety
 
