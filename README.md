@@ -132,3 +132,8 @@ requires `ALLOW_ANY_CONTEXT=1` to run, at your own risk.
 > you have _deliberately_ pointed kubectl at a cluster you are certain is safe to
 > break — pass it per-invocation so it never lingers, e.g.
 > `ALLOW_ANY_CONTEXT=1 make scenario-01`.
+
+## License
+
+Copyright 2026 John Aravanis. Licensed under the Apache License, Version 2.0.
+See [LICENSE](LICENSE) and [NOTICE](NOTICE).
