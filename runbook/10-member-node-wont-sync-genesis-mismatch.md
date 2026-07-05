@@ -1,10 +1,10 @@
 # New/member node won't sync (genesis / config mismatch)
 
 > Backed by scenario: [`10-genesis-config-drift`](../scenarios/10-genesis-config-drift/).
-> Verified on chart 0.3.1 (QBFT, Besu 26.6.0, kind): a joiner with a drifted
+> Verified on chart 0.3.3 (QBFT, Besu 26.6.1, kind): a joiner with a drifted
 > `chainId` stayed at height 0 with 0 useful peers for the whole window while
 > the network advanced; the identical joiner with the correct genesis
-> full-synced 1,921 blocks to head in 10s.
+> full-synced 7,060 blocks to head in 10s.
 
 ## Symptom
 
@@ -68,7 +68,7 @@ it's config drift, not the network.
    restarting with the correct genesis, or it will refuse to start (genesis
    mismatch with its existing chaindata).
 3. **Verify peering** once corrected: peer count climbs and height catches up
-   to head — in the verified run a correct-genesis joiner reached head (1,921
+   to head — in the verified run a correct-genesis joiner reached head (7,060
    blocks) in 10s. With DNS-based enodes, ensure `--Xdns-enabled` /
    `--Xdns-update-enabled` are set (otherwise DNS enodes are rejected
    outright).

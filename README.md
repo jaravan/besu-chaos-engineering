@@ -67,37 +67,37 @@ make cluster-down   # tear down the kind cluster (no-op if you brought your own)
 ## Sample run
 
 What a scenario actually prints — an unedited excerpt from a real
-`make scenario-01` run (kind, chart 0.3.1, QBFT, 2s blocks): one validator
-lost while the network stays healthy, then two — quorum broken, a verified
-halt, and a measured recovery.
+`make scenario-01` run (kind, chart 0.3.3, Besu 26.6.1, QBFT, 2s blocks): one
+validator lost while the network stays healthy, then two — quorum broken, a
+verified halt, and a measured recovery.
 
 ```text
-[03:57:24] === baseline (consensus=qbft) ===
-[PASS] chain advancing (3497 -> 3498 in 2s)
-[03:57:26] === STEP 1: single validator loss (target validator 2) ===
-[03:57:26] --- 1a: ungraceful kill (force delete sbx-validator2-0) ---
-[03:57:26] pod force-deleted at height 3498; chain must keep advancing while it restarts
-[PASS] chain advancing (3498 -> 3500 in 2s)
-[03:57:57] sbx-validator2-0 Ready again after 31s
-[PASS] 1a: restarted validator rejoined (peers=3, height=3511)
+[14:35:36] === baseline (consensus=qbft) ===
+[PASS] chain advancing (17 -> 18 in 2s)
+[14:35:39] === STEP 1: single validator loss (target validator 2) ===
+[14:35:39] --- 1a: ungraceful kill (force delete sbx-validator2-0) ---
+[14:35:39] pod force-deleted at height 19; chain must keep advancing while it restarts
+[PASS] chain advancing (19 -> 20 in 2s)
+[14:36:00] sbx-validator2-0 Ready again after 21s
+[PASS] 1a: restarted validator rejoined (peers=3, height=27)
 ...
-[03:59:17] === STEP 2: quorum loss (scale validators 2 3 to 0) ===
-[03:59:18] both validators gone; expecting halt
-[PASS] chain halted at block 3531 for 45s
-[04:00:08] RPC reads still served during halt: height=3531, validator set query answered
-[04:00:08] surviving validator1 peer count during outage: 1
-[04:00:08] --- recover: scale both back, measure RTO ---
-[04:00:28] both pods Ready after 20s; waiting for first block above 3531
-[PASS] halt duration 71s -> first new block 60s after pods Ready (RTO from scale-up: 80s)
-[04:01:33] --- post-recovery: steady state ---
-[PASS] chain advancing (3532 -> 3533 in 2s)
-[04:01:36] === scenario 01 complete ===
+[14:37:10] === STEP 2: quorum loss (scale validators 2 3 to 0) ===
+[14:37:11] both validators gone; expecting halt
+[PASS] chain halted at block 42 for 45s
+[14:38:06] RPC reads still served during halt: height=42, validator set query answered
+[14:38:06] surviving validator1 peer count during outage: 1
+[14:38:06] --- recover: scale both back, measure RTO ---
+[14:38:26] both pods Ready after 20s; waiting for first block above 42
+[PASS] halt duration 76s -> first new block 58s after pods Ready (RTO from scale-up: 78s)
+[14:39:28] --- post-recovery: steady state ---
+[PASS] chain advancing (43 -> 44 in 2s)
+[14:39:31] === scenario 01 complete ===
 ```
 
 The two lines that matter: the chain **halts** the moment quorum is lost —
 while every pod stays `Ready` and RPC keeps answering (the false comfort this
 repo keeps returning to) — and recovery is **measured**, not assumed
-(`RTO from scale-up: 80s`).
+(`RTO from scale-up: 78s`).
 
 ## Scenarios
 
@@ -132,11 +132,11 @@ What gates, strands, or rejects a transaction while consensus stays healthy. The
 scenarios are engine-agnostic — they exercise the transaction pipeline, not the
 validator set.
 
-| #                                         | Scenario                  | Failure injected                                                                                                  | Consensus      |
+| #                                         | Scenario                  | Failure injected                                                                                                   | Consensus      |
 | ----------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------- |
-| [06](scenarios/06-txpool-flooding/)       | Transaction pool flooding | Saturate a sender's future-nonce queue until Besu rejects (`-32000`), then fill the gap and watch the queue mine  | Any (tx-layer) |
+| [06](scenarios/06-txpool-flooding/)       | Transaction pool flooding | Saturate a sender's future-nonce queue until Besu rejects (`-32000`), then fill the gap and watch the queue mine   | Any (tx-layer) |
 | [07](scenarios/07-account-permissioning/) | Account permissioning     | A funded but not-allowlisted sender is denied at submission (`-32007`); allowlisting via `perm_*` RPC lets it mine | Any (tx-layer) |
-| [08](scenarios/08-permissioning-outage/)  | Permissioning outage      | Empty the allowlist: every sender denied while empty blocks keep flowing — network "up", frozen for users         | Any (tx-layer) |
+| [08](scenarios/08-permissioning-outage/)  | Permissioning outage      | Empty the allowlist: every sender denied while empty blocks keep flowing — network "up", frozen for users          | Any (tx-layer) |
 
 ### State & storage
 
@@ -144,8 +144,8 @@ Whether a node can be rebuilt from what's on disk — and which backups deserve
 the trust. These scenarios operate on one node's data volume; consensus stays
 healthy throughout (the target is beyond quorum).
 
-| #                                    | Scenario         | Failure injected                                                                                                        | Consensus           |
-| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| #                                    | Scenario         | Failure injected                                                                                                            | Consensus           |
+| ------------------------------------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------- |
 | [09](scenarios/09-snapshot-restore/) | Snapshot restore | Restore a validator from cold, hot-idle, and hot-under-load snapshots; a failed hot restore auto-recovers via wipe + resync | Any (storage-layer) |
 
 ### Configuration & onboarding
@@ -154,9 +154,9 @@ What keeps a correctly-running node from ever joining the network. In a
 consortium each member deploys their own node, so configuration drifts — and
 the gate sits below consensus, at the devp2p/eth handshake.
 
-| #                                        | Scenario               | Failure injected                                                                                         | Consensus             |
-| ---------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- | --------------------- |
-| [10](scenarios/10-genesis-config-drift/) | Genesis / config drift | A joiner with a drifted genesis is rejected at the eth handshake — stuck at block 0, network unaffected  | Any (handshake layer) |
+| #                                        | Scenario               | Failure injected                                                                                        | Consensus             |
+| ---------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------- | --------------------- |
+| [10](scenarios/10-genesis-config-drift/) | Genesis / config drift | A joiner with a drifted genesis is rejected at the eth handshake — stuck at block 0, network unaffected | Any (handshake layer) |
 
 ## Runbook
 

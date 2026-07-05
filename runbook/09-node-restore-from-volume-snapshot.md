@@ -1,12 +1,12 @@
 # Restoring a node from a volume snapshot
 
 > Backed by scenario: [`09-snapshot-restore`](../scenarios/09-snapshot-restore/).
-> Verified on chart 0.3.1 (QBFT, Besu 26.6.0, Bonsai, kind): a cold snapshot
-> reopened with 0 DB errors and caught up to gap 0; hot snapshots — idle and
-> under 100+ tx/block write load — reopened cleanly with 0 restarts. The
-> mid-write smear failure has not been reproduced on a small database (the copy
-> completes between RocksDB flushes); treat hot file copies as best-effort
-> regardless.
+> Verified on chart 0.3.3 (QBFT, Besu 26.6.1, Bonsai, kind): a cold snapshot
+> reopened with 0 DB errors and caught up to gap 0 (`Ready` in 21s); hot
+> snapshots — idle and under sustained write load — reopened cleanly with 0
+> restarts (`Ready` in 21–22s). The mid-write smear failure has not been
+> reproduced on a small database (the copy completes between RocksDB flushes);
+> treat hot file copies as best-effort regardless.
 
 ## Symptom
 

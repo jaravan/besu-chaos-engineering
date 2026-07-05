@@ -177,33 +177,31 @@ precisely the runbook's wipe-and-resync case.
 
 ## Observed
 
-Verified against the [besu-sandbox](https://github.com/jaravan/besu-helmcharts)
-chart (**0.3.1**, Besu 26.6.0, 2s block period, Bonsai — metadata
-`"v2": {"format":"BONSAI","version":3}`) on kind (`kind-besu-chaos`, QBFT),
-restoring validator4 on a young chain (database tens of KB). All three steps
-ran; the chain kept producing at 3-of-4 through every stop/restore/restart
-cycle and returned to a full `3/3/3/3` mesh at a common height after each.
+Verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64, 2s block period,
+Bonsai — metadata `"v2": {"format":"BONSAI","version":3}`, QBFT), restoring
+validator4. All three steps ran in one session; the chain kept producing at
+3-of-4 through every stop/restore/restart cycle and returned to a full
+`3/3/3/3` mesh at a common height after each.
 
-| Step                | tar exit(s)  | startup restarts | DB-error lines | Ready after restart | catch-up gap    |
-| ------------------- | ------------ | ---------------- | -------------- | ------------------- | --------------- |
-| 1 · cold            | — (quiesced) | 0                | **0**          | ✓ (not timed)       | **0** (31/31)   |
-| 2 · hot, idle       | 0            | 0                | 0              | **21s**             | **0** (69/69)   |
-| 3 · hot, under load | 0, 0, 0      | 0                | 0              | **31s**             | **0** (115/115) |
+| Step                | tar exit(s)  | startup restarts | DB-error lines | Ready after restart | catch-up gap      |
+| ------------------- | ------------ | ---------------- | -------------- | ------------------- | ----------------- |
+| 1 · cold            | — (quiesced) | 0                | **0**          | **21s**             | **0** (6965/6965) |
+| 2 · hot, idle       | 0            | 0                | 0              | **21s**             | **0** (6975/6975) |
+| 3 · hot, under load | 0, 0, 0      | 0                | 0              | **22s**             | **0** (6993/6993) |
 
-- **STEP 1 — cold.** Snapshot at height 15 with the node stopped; restored
-  over the wiped volume and restarted — clean open, **0** DB-error lines,
-  caught up to **gap 0** (31/31, 3 peers). The deterministic baseline behaved
+- **STEP 1 — cold.** Snapshot at height 6943 with the node stopped; restored
+  over the wiped volume and restarted — clean open, `Ready` in **21s**, **0**
+  DB-error lines, caught up to **gap 0**. The deterministic baseline behaved
   deterministically.
-- **STEP 2 — hot, idle.** tar exit **0** at height 58 (no mid-write capture —
-  the copy of a tens-of-KB database completes between 2s-block writes), then
-  `Ready` **21s** after restart with **0** startup restarts and **0** DB-error
-  lines, gap 0.
-- **STEP 3 — hot, under load.** The caster submitted ~600 async transfers and
-  the load was real: blocks mined during the copy window carried **104–162
-  transactions each** (`eth_getBlockTransactionCountByNumber`: `0x68`, `0xa2`,
-  `0x8e`). All three back-to-back hot tars **still exited 0** — none was
-  caught mid-write — and the restored copy reopened with 0 restarts, 0
-  DB-error lines, gap 0.
+- **STEP 2 — hot, idle.** tar exit **0** at height 6965 (no mid-write capture —
+  the copy completes between 2s-block writes), then `Ready` **21s** after
+  restart with **0** startup restarts and **0** DB-error lines, gap 0.
+- **STEP 3 — hot, under load.** The caster streamed sequential-nonce transfers
+  and the load was real — an independent sampling of the mined blocks during a
+  load window counted up to **126 transactions per block**
+  (`eth_getBlockTransactionCountByNumber`). All three back-to-back hot tars
+  **still exited 0** — none was caught mid-write — and the restored copy
+  reopened with 0 restarts, 0 DB-error lines, gap 0.
 - **The expected smear did not materialise, and the reason is itself the
   finding.** On a database this small the tar completes in milliseconds, and
   RocksDB absorbs writes in its WAL/memtable between SST flushes — so the

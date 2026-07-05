@@ -66,8 +66,8 @@ make scenario-08 KEEP_NETWORK=1  # keep the besu-perm network for inspection
 
 ## Observed
 
-Run against a freshly-installed `sbxperm` network on kind v0.32.0 (macOS/arm64,
-kubectl 1.36.1, chart 0.3.1, Besu 26.6.0, QBFT, free gas):
+Verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64, QBFT, free gas)
+against a freshly-installed `sbxperm` network:
 
 - **Baseline** — the operational account `0x57f2…` (allowlisted + funded) submitted a tx
   → **mined**; `perm_getAccountsAllowlist` = `[0x57f2…]`; chain advancing.

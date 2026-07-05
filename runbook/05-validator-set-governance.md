@@ -1,7 +1,7 @@
 # Changing the validator set (offboard / onboard a member)
 
 > Backed by scenario: [`04-validator-governance`](../scenarios/04-validator-governance/).
-> Verified on **both QBFT and IBFT 2.0**:
+> Verified on **both QBFT and IBFT 2.0** (chart 0.3.3, Besu 26.6.1):
 > a majority vote removed a validator in ~9s and re-added it in ~6s, no restart and
 > no pause in block production; a standing proposal proved **in-memory only** —
 > dropped on a node restart, but **not** expired by the epoch boundary. The

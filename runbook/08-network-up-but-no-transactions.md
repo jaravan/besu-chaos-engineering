@@ -2,9 +2,9 @@
 
 > Backed by scenario:
 > [`08-permissioning-outage`](../scenarios/08-permissioning-outage/). Verified on
-> chart 0.3.1: emptying the allowlist locked out the operational account
-> (`-32007`) while the chain kept advancing (height 5 → 6), and re-adding it on all
-> four validators cleared the outage with no restart.
+> chart 0.3.3 (Besu 26.6.1): emptying the allowlist locked out the operational
+> account (`-32007`) while the chain kept producing blocks, and re-adding it on
+> all four validators cleared the outage with no restart.
 
 ## Symptom
 

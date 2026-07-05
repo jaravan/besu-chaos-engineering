@@ -108,14 +108,14 @@ Both engines behaved as hypothesised and near-identically: mild and moderate
 degradation was absorbed with no effect, and only once the egress delay crossed
 `requesttimeoutseconds` did the slow node's proposer slots round-change — while
 the chain kept advancing on 3-of-4 the whole time and the node recovered the
-instant the shaping was removed. One run per engine, kind v0.32.0 (macOS/arm64,
-kubectl 1.36.1, **chart 0.2.3**, Besu 26.6.0, 2s block period,
-`requesttimeoutseconds` 10), validator4 degraded.
+instant the shaping was removed. One run per engine, verified on chart **0.3.3**
+(Besu 26.6.1, kind on macOS/arm64, 2s block period, `requesttimeoutseconds` 10),
+validator4 degraded.
 
 | Engine   | 3a (400ms)             | 3b (800ms+25% loss)    | 3c (12s delay) — Round>0 blocks                      | Slow-node RPC under 3c | Recovery on unshape          |
 | -------- | ---------------------- | ---------------------- | ---------------------------------------------------- | ---------------------- | ---------------------------- |
-| QBFT     | no effect, gap 0, 0 RC | no effect, 0 RC        | **4 blocks at Round=1** (seq 232, 235, 238, …)       | unreachable            | gap 0 instantly, no catch-up |
-| IBFT 2.0 | no effect, gap 0, 0 RC | no effect, gap 0, 0 RC | **4 blocks at Round=1** (seq 4301, 4304, 4307, 4310) | unreachable            | gap 0 instantly, no catch-up |
+| QBFT     | no effect, gap 0, 0 RC | no effect, 0 RC        | **3 blocks at Round=1** (seq 150, 153, 156)          | unreachable            | gap 0 instantly, no catch-up |
+| IBFT 2.0 | no effect, gap 0, 0 RC | no effect, gap 0, 0 RC | **4 blocks at Round=1** (seq 6427, 6430, 6433, 6436) | unreachable            | gap 0 instantly, no catch-up |
 
 - **3a (delay 400ms): no effect, both engines.** Chain advanced normally, the
   slow node stayed at head (gap 0), zero round-changes. 400ms is trivial against
@@ -133,7 +133,7 @@ kubectl 1.36.1, **chart 0.2.3**, Besu 26.6.0, 2s block period,
   engines.** Now the slow node's proposal can never reach the others before their
   round-0 timer fires. Its proposer slots round-changed to a healthy node — the
   healthy node logged blocks committed at **`Round=1`** on the slow node's
-  recurring proposer slots (QBFT seq 232/235/238…, IBFT 2.0 seq 4301/4304/4307/4310),
+  recurring proposer slots (QBFT seq 150/153/156, IBFT 2.0 seq 6427/6430/6433/6436),
   while round-0 (healthy-proposer) blocks committed normally. **The chain kept
   advancing on 3-of-4 throughout**; it just produced in bursts, stalling ~10s on
   each slot the slow node should have proposed.
@@ -156,8 +156,10 @@ kubectl 1.36.1, **chart 0.2.3**, Besu 26.6.0, 2s block period,
 
 **Consensus comparison.** Engine-independent, as expected: both QBFT and IBFT 2.0
 absorbed 3a and 3b with zero round-changes and crossed the cliff at the same 12s
-point, producing four `Round=1` commits on the slow node's proposer slots while
-advancing on 3-of-4, and both recovered instantly on unshape with no catch-up.
+point, producing `Round=1` commits on every one of the slow node's proposer
+slots in the window (3 QBFT / 4 IBFT 2.0 — one window caught one more slot)
+while advancing on 3-of-4, and both recovered instantly on unshape with no
+catch-up.
 The only engine difference is cosmetic — the **log line that carries the committed
 round differs**: QBFT logs `QbftRound | Importing proposed block to chain …
 Round=N`, IBFT 2.0 logs `IbftRound | Importing block to chain … Round=N`. Both

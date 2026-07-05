@@ -2,7 +2,7 @@
 
 > Backed by scenario:
 > [`07-account-permissioning`](../scenarios/07-account-permissioning/). Verified on
-> chart 0.3.1: a funded-but-not-allowlisted account was denied with `-32007`,
+> chart 0.3.3 (Besu 26.6.1): a funded-but-not-allowlisted account was denied with `-32007`,
 > allowlisting it on all four validators let it mine (nonce 0 → 1), and removing it
 > denied again.
 

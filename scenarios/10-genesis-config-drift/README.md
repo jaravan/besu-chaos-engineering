@@ -74,19 +74,18 @@ drift ConfigMap.
 
 ## Observed
 
-Verified against the [besu-sandbox](https://github.com/jaravan/besu-helmcharts)
-chart (**0.3.1**, Besu 26.6.0, QBFT, 2s block period) on kind
-(`kind-besu-chaos`), drifting `chainId` 1337 → 1337001:
+Verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64, QBFT, 2s block
+period), drifting `chainId` 1337 → 1337001:
 
-- **STEP 1 — control:** the joiner full-synced **1,921 blocks from genesis in
-  10s** (gap 0, 2 peers) — wiring proven, and a concrete onboarding
-  time-to-sync datapoint for a young chain.
+- **STEP 1 — control:** the joiner full-synced **7,060 blocks to head in 10s**
+  (gap 0, 2 peers) — wiring proven, and a concrete onboarding time-to-sync
+  datapoint.
 - **STEP 2 — drift:** the identical pod with the drifted genesis stayed at
   **height 0, 0 peers** for the full 75s window while the main network
-  advanced past head 1960. Besu's startup banner names the drifted identity
+  advanced past head 7098. Besu's startup banner names the drifted identity
   (`Network Id: 1337001`) and the log shows the operator-facing signal:
   `Unable to find sync target. Waiting for 1 peers minimum. Currently
-checking 0 peers for usefulness` — dialing succeeds, the handshake doesn't.
+  checking 0 peers for usefulness` — dialing succeeds, the handshake doesn't.
 - **The main network was unaffected throughout** — advancing at baseline,
   during the drift window, and after teardown.
 

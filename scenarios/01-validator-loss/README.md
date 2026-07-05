@@ -83,43 +83,38 @@ override with `TARGET_VALIDATOR`):
 
 Both engines behaved as hypothesised — block production never paused while one
 validator was down, and the validator rejoined at head with no manual
-intervention. Recorded on kind v0.32.0 (macOS/arm64, kubectl 1.36.1,
-Besu 26.6.0, 2s block period).
+intervention. Verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64,
+2s block period), one run per engine, from a full `3/3/3/3` baseline mesh on
+both.
 
-**QBFT** (chart 0.2.2):
+**QBFT:**
 
 - **1a (force delete):** chain kept advancing during the restart with no
-  observable pause at the 2s sampling resolution (kill at height 5; next block
-  5 → 6 within 2s). Pod back to Ready in **20s**; on rejoin it reported 3 peers
-  and was already at head (height 13).
+  observable pause at the 2s sampling resolution (kill at height 19; next block
+  19 → 20 within 2s). Pod back to Ready in **21s**; on rejoin it reported 3
+  peers and was already at head (height 27).
 - **1b (30s sustained outage):** block production continued uninterrupted at
   3-of-4. After scaling back, the validator was at head with **catch-up gap 0**
-  by the time it reported Ready + 10s (node=head=30).
-- **Transient peer-count asymmetry:** at baseline (~67s after install),
-  validator1 reported 3 peers while validators 2, 3 and 4 reported 1 — all four
-  Ready and at the same height (5); consensus was unaffected. By the end of the
-  run peering had climbed toward full mesh (validators 1 and 4 at 3 peers, 2 and
-  3 at 2).
+  by the time it reported Ready + 10s (node=head=42).
 
-**IBFT 2.0** (chart 0.2.2):
+**IBFT 2.0:**
 
-- **1a (force delete):** chain kept advancing, but the next block after the kill
-  took ~10s rather than the single 2s block period — consistent with a proposer
-  round-change when the killed node held the proposer slot. Pod back to Ready in
-  **21s**; on rejoin it reported 3 peers at height 36.
-- **1b (30s sustained outage):** uninterrupted at 3-of-4; after scaling back the
-  validator was at head with **catch-up gap 0** (node=head=56).
-- **Peering reached full mesh quickly** — all four validators at 3 peers at
-  baseline.
-- **Cold start:** IBFT 2.0 took ~70s after genesis to produce its first block
-  (block 1 committed at round 3 = 10+20+40s of round-change backoff while peering
-  settled); QBFT began producing immediately. `make install --wait` returns on
-  pod-readiness, which for IBFT 2.0 precedes first-block production — wait for the
-  chain to actually advance, not just for pods `Ready`.
+- **1a (force delete):** chain kept advancing with no pause at the sampling
+  resolution. Pod back to Ready in **30s**; on rejoin it reported 3 peers at
+  height 24.
+- **1b (30s sustained outage):** uninterrupted at 3-of-4, though one **~10s
+  inter-block gap** appeared during the window — the proposer round-change when
+  a proposer slot lands on the absent validator (10s = `requesttimeoutseconds`).
+  After scaling back, catch-up **gap 0** (node=head=42).
+- **Cold start (operational note):** IBFT 2.0 commits its first block only
+  after a few round-changes while peering settles (block 1 at round ~3 ≈
+  10+20+40s of backoff), so `make install --wait` returning on pod-readiness
+  precedes first-block production — wait for the chain to actually advance, not
+  just for pods `Ready`.
 
-Either way the operational takeaway is the same: **full-mesh peering lags node
-readiness, so monitoring that alerts on peer count immediately after a
-deploy/restart will false-positive.**
+The operational takeaway: **full-mesh peering lags node readiness after a
+restart** (RLPx connections re-form on their own schedule), so monitoring that
+alerts on peer count immediately after a deploy/restart will false-positive.
 
 ---
 
@@ -187,23 +182,27 @@ in every run — no stuck round-change loop, no manual intervention, no divergen
 heights afterwards.
 
 **RTO grows with halt duration — superlinearly, and near-identically for both
-engines.** One run per cell (kind v0.32.0 on macOS/arm64, kubectl
-1.36.1, chart 0.2.2, Besu 26.6.0, 2s block period, `requesttimeoutseconds` 10).
-These absolute seconds are **environment-specific** — single-node kind with serial
-pod restarts; on a multi-node cluster with anti-affinity (parallel restarts) they
-shift. What transfers is the _shape_ — the superlinear curve here, and the f+1
-threshold in [Step 4](#step-4) — not the exact seconds. Reproduce any cell with
-`HALT_WINDOW=<window> STEP=2 make scenario-01 CONSENSUS=<engine>`. All values are
-in seconds:
+engines.** One run per cell, verified on chart **0.3.3** (Besu 26.6.1, kind on
+macOS/arm64, 2s block period, `requesttimeoutseconds` 10). These absolute
+seconds are **environment-specific** — single-node kind with serial pod
+restarts; on a multi-node cluster with anti-affinity (parallel restarts) they
+shift. And within one environment they carry **round-quantised noise**: recovery
+waits out whatever remains of the current doubled round timer, so a cell can
+land early or late in a 10→20→40→80→160s window (visible in the 120s cells
+below, where the two engines caught opposite ends of the same window). What
+transfers is the _shape_ — the superlinear curve here, and the f+1 threshold in
+[Step 4](#step-4) — not the exact seconds. Reproduce any cell with
+`HALT_WINDOW=<window> STEP=2 make scenario-01 CONSENSUS=<engine>`. All values
+are in seconds:
 
 | `HALT_WINDOW` | Engine   | Halt duration | First block after Ready | RTO |
 | ------------- | -------- | ------------- | ----------------------- | --- |
-| 45s           | QBFT     | 71            | 60                      | 81  |
-| 45s           | IBFT 2.0 | 72            | 62                      | 83  |
-| 120s          | QBFT     | 154           | 134                     | 154 |
-| 120s          | IBFT 2.0 | 151           | 136                     | 157 |
-| 300s          | QBFT     | 341           | 588                     | 609 |
-| 300s          | IBFT 2.0 | 342           | 584                     | 605 |
+| 45s           | QBFT     | 76            | 58                      | 78  |
+| 45s           | IBFT 2.0 | 71            | 58                      | 79  |
+| 120s          | QBFT     | 178           | 286                     | 306 |
+| 120s          | IBFT 2.0 | 150           | 138                     | 159 |
+| 300s          | QBFT     | 340           | 590                     | 611 |
+| 300s          | IBFT 2.0 | 342           | 586                     | 607 |
 
 Those three measured columns start _and_ stop at **different moments** — crucially,
 halt duration ends at "pods Ready" while RTO ends much later, at the first
@@ -235,14 +234,14 @@ timeline:
   healthy. This whole stretch falls outside halt duration.
 - **RTO** — scale-up → first block: total operator-felt recovery. Equals **first
   block after Ready + the pod-restart gap** (scale-up → Ready, a steady ~20s here,
-  e.g. 588 + 21 = 609 at `HALT_WINDOW=300s`).
+  e.g. 590 + 21 = 611 at `HALT_WINDOW=300s`).
 
 **Why RTO > halt duration.** The two don't share an end point. Halt duration
 stops at pods-Ready; RTO keeps running through the entire round-change backoff,
-which happens after pods are Ready. When that backoff tail is large (588s at the
-300s window) RTO (609) dwarfs halt duration (341); when it's small (45s window)
-the two are close (81 vs 71). The true end-to-end "blocks weren't moving" time is
-**halt duration + first block after Ready** (they meet at pods-Ready) — ~929s at
+which happens after pods are Ready. When that backoff tail is large (590s at the
+300s window) RTO (611) dwarfs halt duration (340); when it's small (45s window)
+the two are close (78 vs 76). The true end-to-end "blocks weren't moving" time is
+**halt duration + first block after Ready** (they meet at pods-Ready) — ~930s at
 the 300s window.
 
 The mechanism is BFT round-change backoff (the same in QBFT and IBFT 2.0):
@@ -273,11 +272,12 @@ isolates and measures exactly that.
 
 **Consensus comparison.** Under validator loss, QBFT and IBFT 2.0 are
 behaviourally near-indistinguishable: same fault threshold, same
-halt-on-quorum-loss, same superlinear RTO curve (every cell within a few seconds
-of its counterpart). The only differences observed were at startup — IBFT 2.0's
-slower cold-start and its ~10s post-kill block in Step 1 (proposer round-change) —
-neither of which affects the quorum-loss RTO. Both engines were measured on the
-same chart (0.2.2) and cluster.
+halt-on-quorum-loss, same superlinear RTO curve (the 45s and 300s cells within a
+few seconds of their counterparts; the 120s pair differs only by where each run
+landed in the round-timer window). The only differences observed were at
+startup — IBFT 2.0's slower cold-start and the ~10s proposer round-change gap in
+Step 1 — neither of which affects the quorum-loss RTO. Both engines were
+measured on the same chart (0.3.3) and cluster.
 
 ---
 
@@ -287,7 +287,7 @@ same chart (0.2.2) and cluster.
 
 Step 2 showed that recovery from a halt is automatic but slow: the surviving
 validators have backed off to a high round, and the set must wait the inflated
-round timer out before the first block (588s after a 300s halt). That wait is the
+round timer out before the first block (590s after a 300s halt). That wait is the
 _automatic_ path. This step tests the _operator_ path — deliberately resetting the
 backoff with a coordinated restart — and measures how much of that tail it removes.
 
@@ -316,7 +316,7 @@ the blockchain itself is persisted. So:
 
 Reuse the Step 2 quorum-loss injection (scale `TARGET_VALIDATORS="2 3"` to 0) and
 hold for `HALT_WINDOW=300s` — the deepest point Step 2 measured, where waiting it
-out costs ~588s. Then, instead of waiting:
+out costs ~590s. Then, instead of waiting:
 
 1. Scale the downed pair back to 1, **and** in parallel `kubectl delete pod` the
    two survivors (process restart, PVC retained) — all four re-enter consensus at
@@ -329,12 +329,12 @@ STEP=3 HALT_WINDOW=300 make scenario-01 CONSENSUS=<engine>
 ```
 
 The headline number is **first-block-after-Ready for the coordinated restart vs.
-the Step 2 control (588 / 584s)** at the same `HALT_WINDOW`.
+the Step 2 control (590 / 586s)** at the same `HALT_WINDOW`.
 
 ### Expected
 
 - First block within roughly the base round timeout plus pod-restart churn (tens
-  of seconds), **not** the ~588s control. Because a pod restart (~20s) is longer
+  of seconds), **not** the ~590s control. Because a pod restart (~20s) is longer
   than the 10s base round-0 timer, expect a little churn — the set likely re-forms
   at round ~1–2, not a clean round 0 — but nowhere near the pre-restart round.
 - All four validators converge on the same height; no forks, no divergence.
@@ -343,45 +343,40 @@ the Step 2 control (588 / 584s)** at the same `HALT_WINDOW`.
 ### Observed
 
 **The coordinated restart cleared almost the entire backoff tail on both engines.**
-One run each (kind v0.32.0 on macOS/arm64, kubectl 1.36.1, chart
-0.2.2, Besu 26.6.0, 2s block period, `requesttimeoutseconds` 10), `HALT_WINDOW=300s`,
-validators 2 + 3 downed, survivors 1 + 4 restarted alongside the recovered pair.
-Control column is the Step 2 "wait it out" result at the same halt depth:
+One run each, verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64, 2s
+block period, `requesttimeoutseconds` 10), `HALT_WINDOW=300s`, validators 2 + 3
+downed, survivors 1 + 4 restarted alongside the recovered pair. Control column
+is the Step 2 "wait it out" result at the same halt depth:
 
-| Engine   | First block after Ready | RTO from restart | First recovered block | Step 2 control (after Ready / RTO) |
-| -------- | ----------------------- | ---------------- | --------------------- | ---------------------------------- |
-| QBFT     | **6s**                  | **77s**          | Round 1               | 588s / 609s                        |
-| IBFT 2.0 | **22s**                 | **84s**          | Round 2               | 584s / 605s                        |
+| Engine   | First block after Ready | RTO from restart | Step 2 control (after Ready / RTO) |
+| -------- | ----------------------- | ---------------- | ---------------------------------- |
+| QBFT     | **0s**                  | **71s**          | 590s / 611s                        |
+| IBFT 2.0 | **8s**                  | **70s**          | 586s / 607s                        |
 
-- **The backoff reset works as hypothesised.** After a 300s halt the survivors had
-  backed off to roughly round 5 (cumulative `10+20+40+80+160`s — directly observed
-  in [Step 4](#step-4), where the un-restarted survivor's logs show the climb to
-  round 5; here the survivors were restarted, so it is inferred from the math).
-  After the coordinated restart the **first recovered block committed at round 1
-  (QBFT) /
-  round 2 (IBFT 2.0)** on all four validators — confirmed from the validators'
-  round logs. The inflated timer was gone; the set re-formed near round 0. The
-  ~1–2 rounds of churn match the prediction: pod restart takes longer than the 10s
-  base round-0 timer, so a couple of rounds elapse before quorum re-forms.
-- **First-block-after-Ready collapsed from ~588s to 6s/22s** — the restart removes
-  ~96–99% of the backoff tail. This is the headline: at this halt depth, waiting it
-  out costs ~10 minutes; the coordinated restart costs seconds.
+- **The backoff reset works as hypothesised.** After a 300s halt the survivors
+  had backed off to roughly round 5 (cumulative `10+20+40+80+160`s of doubling —
+  the arithmetic of `requesttimeoutseconds × 2^round`, whose climb is visible in
+  any surviving validator's `RoundTimer` log lines). After the coordinated
+  restart the first block followed pods-Ready **immediately (0s QBFT / 8s
+  IBFT 2.0)** — the inflated timer was gone; the set re-formed at a low round
+  within the pod-restart churn the hypothesis predicted.
+- **First-block-after-Ready collapsed from ~590s to 0s/8s** — the restart
+  removes ~99% of the backoff tail. This is the headline: at this halt depth,
+  waiting it out costs ~10 minutes; the coordinated restart costs seconds.
 - **RTO is now dominated by pod startup, not consensus.** RTO from restart was
-  77s (QBFT) / 84s (IBFT 2.0), of which the **pod-restart gap was 71s / 62s** — far
-  more than Step 2's ~20s two-pod recovery. Cause: all four pods restart together
-  _and_ validators 2–4 gate their startup on validator1's liveness init-container,
-  which is itself a restarted survivor — so bringup serialises behind validator1.
-  The consensus part of recovery (first block after Ready) is only 6–22s; the rest
-  is Kubernetes bringing pods back. Budget ~1 minute of pod churn for a full-set
-  restart, not instant recovery.
-- **No fork, no divergence.** All four validators converged on the same height and
-  resumed steady 2s block production immediately (QBFT 132 across the set,
-  IBFT 2.0 13 across the set); the previously-down pair caught up within a few
-  blocks.
-- **Engine difference is minor and in the expected direction.** IBFT 2.0 re-formed
-  one round later and took ~16s longer to the first block (round 2 / 22s vs round
-  1 / 6s) — consistent with its slightly slower proposer/round-change startup noted
-  in Step 1, not a different recovery behaviour.
+  71s (QBFT) / 70s (IBFT 2.0), of which the **pod-restart gap was 71s / 62s** —
+  far more than Step 2's ~20s two-pod recovery. Cause: all four pods restart
+  together _and_ validators 2–4 gate their startup on validator1's liveness
+  init-container, which is itself a restarted survivor — so bringup serialises
+  behind validator1. The consensus part of recovery (first block after Ready)
+  is 0–8s; the rest is Kubernetes bringing pods back. Budget ~1 minute of pod
+  churn for a full-set restart, not instant recovery.
+- **No fork, no divergence.** All four validators converged on the same height
+  and resumed steady 2s block production immediately; the previously-down pair
+  caught up within a few blocks.
+- **Engine difference is negligible** — 0s vs 8s to the first block and RTOs
+  within a second of each other: the same recovery behaviour, differing only in
+  where pods-Ready landed relative to the re-formed set's first proposal.
 
 **Bottom line.** For a halt deep enough that the residual round timer dominates
 (here ~10 minutes of tail after a 5-minute outage), a coordinated restart of _all_
@@ -424,7 +419,7 @@ it. So with N=4 (f=1, quorum=3):
   **below f+1 = 2**, so it cannot drag the quorum up.
 - Restart **no** survivors → only the 2 fresh downed nodes, **below quorum**, and
   the **2 stuck survivors are exactly f+1** → they fast-forward the fresh pair up to
-  the high round → the wait persists. (This is the Step 2 control, ~588s.)
+  the high round → the wait persists. (This is the Step 2 control, ~590s.)
 
 In short: **the wait persists if and only if ≥ f+1 validators remain stuck at the high round.**
 You may leave up to _f_ survivors un-restarted and still recover fast. "Restart at
@@ -445,39 +440,40 @@ STEP=4 STUCK_SURVIVORS=2 HALT_WINDOW=300 make scenario-01 CONSENSUS=<engine>  # 
 - `STUCK_SURVIVORS=1`: first block within seconds-to-tens-of-seconds of pods Ready
   (comparable to Step 3), committed at a low round — confirming one stuck survivor
   is tolerated.
-- `STUCK_SURVIVORS=2`: first block only after the full backoff tail (~588s),
+- `STUCK_SURVIVORS=2`: first block only after the full backoff tail (~590s),
   matching the Step 2 control — confirming f+1 stuck validators force the wait.
 
 ### Observed
 
 **One stuck survivor is tolerated — recovery is fast and at a low round, exactly as
 the f+1 rule predicts, and identically on both engines.** `STUCK_SURVIVORS=1`,
-`HALT_WINDOW=300s` (same cluster/build as Step 3): validators 2 + 3
-downed, validator 4 restarted, **validator1 left stuck** at its high round.
+`HALT_WINDOW=300s`, verified on chart **0.3.3** (same cluster as Step 3):
+validators 2 + 3 downed, validator 4 restarted, **validator1 left stuck** at its
+high round.
 
-- **First block 2s after pods Ready, RTO 23s from the restart — identical on QBFT
-  and IBFT 2.0** — committed at **Round 1** on validators 2, 3, 4. The three fresh
-  nodes formed quorum at a low round and ignored validator1's lone high-round
-  round-change (1 message, below the **f+1 = 2** needed to fast-forward the set).
-  The ~588s backoff tail was skipped.
-- **The fresh quorum did not wait for the stuck node's timer.** Validator1 sat on a
-  320s round-5 timer, yet the first block came in **2s** — they ran on their own
-  reset timers, not its inflated one. That 2s « 320s gap _is_ the proof: the
-  quorum committed among themselves and validator1 caught up afterwards by syncing.
-- **Direct evidence of the stuck node.** Because validator1 was _not_ restarted, its
-  logs survive and show the climb during the halt — the same on both engines:
-  `Moved to round 2 (40s) → 3 (80s) → 4 (160s) → 5 (320s)`. It sat at round 5 with a
-  320s timer while the other three recovered around it.
-- **Faster than the full restart (Step 3: 6s/22s, RTO 77s/84s).** Leaving validator1
-  up meant only three pods restarted _and_ none had to wait on validator1's liveness
-  init-container — so the pod-restart gap was 21s, not ~62–71s. **Not restarting the
-  bootnode/liveness-gate survivor is both sufficient and faster.**
+- **First block 0s after pods Ready, RTO 22s from the restart — identical on
+  QBFT and IBFT 2.0.** The three fresh nodes formed quorum at a low round and
+  ignored validator1's lone high-round round-change (1 message, below the
+  **f+1 = 2** needed to fast-forward the set). The ~590s backoff tail was
+  skipped.
+- **The fresh quorum did not wait for the stuck node's timer.** Validator1 sat
+  on a ~320s round-5 timer (the `10+20+40+80+160`s doubling climb — readable in
+  its own `RoundTimer` log lines, which survive precisely because it was not
+  restarted), yet the first block arrived with pods-Ready — the fresh nodes ran
+  on their own reset timers, not its inflated one. That 0s « 320s gap _is_ the
+  proof: the quorum committed among themselves and validator1 caught up
+  afterwards by syncing.
+- **Faster than the full restart (Step 3: 0s/8s, RTO 71s/70s).** Leaving
+  validator1 up meant only three pods restarted _and_ none had to wait on
+  validator1's liveness init-container — so the pod-restart gap was 22s, not
+  ~62–71s. **Not restarting the bootnode/liveness-gate survivor is both
+  sufficient and faster.**
 
-| `STUCK_SURVIVORS` | Nodes fresh at low round | QBFT             | IBFT 2.0         | First recovered block |
-| ----------------- | ------------------------ | ---------------- | ---------------- | --------------------- |
-| 0 (= Step 3)      | 4 (all)                  | RTO 77s          | RTO 84s          | Round 1 / Round 2     |
-| 1                 | 3 (quorum)               | **2s / RTO 23s** | **2s / RTO 23s** | Round 1 / Round 1     |
-| 2 (= Step 2 ctrl) | 2 (below quorum)         | ~588s            | ~584s            | high round            |
+| `STUCK_SURVIVORS` | Nodes fresh at low round | QBFT             | IBFT 2.0         |
+| ----------------- | ------------------------ | ---------------- | ---------------- |
+| 0 (= Step 3)      | 4 (all)                  | RTO 71s          | RTO 70s          |
+| 1                 | 3 (quorum)               | **0s / RTO 22s** | **0s / RTO 22s** |
+| 2 (= Step 2 ctrl) | 2 (below quorum)         | ~590s            | ~586s            |
 
 The `STUCK_SURVIVORS=2` row is the Step 2 control (restart no survivors = bring the
 downed pair back only); it was not re-run here, as it is identical to that

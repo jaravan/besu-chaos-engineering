@@ -89,16 +89,16 @@ make scenario-06 MAX_SUBMIT=260   # cap the future-nonce loop (default 260; cap 
 
 ## Observed
 
-Run against the main network on kind v0.32.0 (macOS/arm64, kubectl 1.36.1, chart 0.3.1,
-Besu 26.6.0, `cast` 1.7.1, QBFT, free gas). Funded sender `0x57F2fAA6…27c47`, starting
-nonce 0:
+Verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64, foundry `cast`,
+QBFT, free gas) against the main network. Funded sender `0x57F2fAA6…27c47`,
+starting nonce 0:
 
 | Step              | Result                                                                                                                         |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | 6a · saturate     | **199** future txs accepted (nonces 1–199), **nonce 200 rejected** `-32000: …nonce is too distant…`; sender nonce stayed **0** |
 | 6b · fill gap     | submitting nonce 0 promoted the whole queue — nonce jumped **0 → 200**                                                         |
-| 6c · zero-balance | fresh key's tx **accepted** (hash returned), **unmined** at nonce 0 for 8s; **1 wei** funding → mined, nonce **0 → 1**         |
-| 6d · health       | `eth_blockNumber` served, chain advancing (39 → 40) throughout                                                           |
+| 6c · zero-balance | fresh key's tx **accepted** (hash returned), **unmined** at nonce 0 while the balance was zero; **1 wei** funding → mined, nonce **0 → 1** |
+| 6d · health       | `eth_blockNumber` served, chain advancing throughout the flood                                                                 |
 
 - **6a — the per-sender future cap is explicit, not silent.** With a gap left at nonce
   0, nonces 1–199 were accepted (199 future txs) and **nonce 200 was rejected** with
@@ -120,7 +120,7 @@ nonce 0:
   mines fine at gasPrice 0 — confirming the gas price is irrelevant.
 
   Mechanically this is Besu's
-  [`SenderBalanceChecker`](https://github.com/hyperledger/besu/blob/26.6.0/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/layered/SenderBalanceChecker.java#L86)
+  [`SenderBalanceChecker`](https://github.com/hyperledger/besu/blob/26.6.1/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/layered/SenderBalanceChecker.java#L86)
   in the **layered transaction pool** (not block creation): its `WorldStateChecker`
   reads the sender's balance from the chain-head world state, and a pending tx whose
   sender has zero balance fails `hasEnoughBalanceFor`, so the pool holds it back from
@@ -180,12 +180,12 @@ apply, so the field reads `-1`. That is **not** "unlimited": the 50 MB memory bu
 still bounds the pool. To cap the layered pool, set `tx-pool-layer-max-capacity` (bytes);
 to get a transaction-count cap, run `--tx-pool=sequenced`.
 
-All values pinned to the chart's Besu (26.6.0):
-[`TransactionPoolConfiguration`](https://github.com/hyperledger/besu/blob/26.6.0/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/TransactionPoolConfiguration.java)
+All values pinned to the chart's Besu (26.6.1):
+[`TransactionPoolConfiguration`](https://github.com/hyperledger/besu/blob/26.6.1/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/TransactionPoolConfiguration.java)
 (the defaults — `DEFAULT_PENDING_TRANSACTIONS_LAYER_MAX_CAPACITY_BYTES` 50 MB,
 `DEFAULT_MAX_PRIORITIZED_TRANSACTIONS` 5000, `DEFAULT_MAX_FUTURE_BY_SENDER` 200,
 `DEFAULT_MAX_PENDING_TRANSACTIONS` 4096, and the `Implementation` enum) and
-[`TransactionPoolOptions`](https://github.com/hyperledger/besu/blob/26.6.0/app/src/main/java/org/hyperledger/besu/cli/options/TransactionPoolOptions.java)
+[`TransactionPoolOptions`](https://github.com/hyperledger/besu/blob/26.6.1/app/src/main/java/org/hyperledger/besu/cli/options/TransactionPoolOptions.java)
 (the `--tx-pool*` flags and their two option groups).
 
 ## Concurrent submitters (consortium reality)

@@ -254,8 +254,8 @@ A pass checklist — the reasoning is in [Hypothesis](#hypothesis), the results 
 
 ## Observed
 
-Verified on **both QBFT and IBFT 2.0** (chart 0.2.3, kind v0.32.0 macOS/arm64,
-Besu 26.6.0, 2s block period, `requesttimeoutseconds 10`), set
+Verified on **both QBFT and IBFT 2.0** (chart **0.3.3**, Besu 26.6.1, kind on
+macOS/arm64, 2s block period, `requesttimeoutseconds 10`), set
 `{5e6bb0a9, 9418ba4c, c156280, c4393b1c}`, target `c4393b1c`. The full 4a–4d run was
 recorded on a fresh `epochlength 50` chain (`make install EPOCHLENGTH=50`) on each
 engine so the epoch-boundary steps (4b iii, 4c ii) are reachable in-session; 4a, 4b(i),
@@ -264,7 +264,7 @@ engines behaved near-identically:
 
 | Step                          | QBFT                                   | IBFT 2.0                               |
 | ----------------------------- | -------------------------------------- | -------------------------------------- |
-| 4a · Vote OUT (3 of 4)        | applied **9s**, set → 3                | applied **12s**, set → 3               |
+| 4a · Vote OUT (3 of 4)        | applied **9s**, set → 3                | applied **9s**, set → 3                |
 | 4a · Vote IN (3 of 3)         | applied **6s**, set → 4                | applied **6s**, set → 4                |
 | 4a · Re-added node            | proposed **5 blocks** since rejoin     | proposed **5 blocks** since rejoin     |
 | 4b(i) · restart, stay silent  | stamped vote counts → **set 4→5**      | stamped vote counts → **set 4→5**      |
@@ -277,7 +277,7 @@ engines behaved near-identically:
 
 - **4a — applied on majority, not at the epoch.** Casting
   `proposeValidatorVote(0xc4393b1c…, false)` on validators 1, 2, 3 removed
-  `c4393b1c` a few blocks later — in 9–12s — **on a chain whose `epochlength` is
+  `c4393b1c` a few blocks later — in ~9s — **on a chain whose `epochlength` is
   30000 blocks** (~16.7h at 2s). If application waited for an epoch boundary we
   would have waited hours; we waited seconds. This matches the Besu docs:
   _"When more than 50% of the existing validators have published a matching proposal,
@@ -358,7 +358,7 @@ engines behaved near-identically:
 
 **Consensus comparison.** Verified engine-independent, not just by construction:
 the full 4a–4d run was executed on **both** QBFT and IBFT 2.0 and was near-identical
-— vote-out in 9s/12s, re-add in 6s, a restarted node's stamped vote still counting
+— vote-out in 9s, re-add in 6s, a restarted node's stamped vote still counting
 (4b i), overridden by an opposite vote (4b ii) and flushed at the epoch (4b iii),
 per-node visibility (4c i), a live proposal surviving the epoch (4c ii), and the
 offboarding reconstructable from one node's headers (4d) on each.

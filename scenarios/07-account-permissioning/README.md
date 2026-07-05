@@ -75,8 +75,8 @@ remains the source of truth across restarts.
 
 ## Observed
 
-Run against a freshly-installed `sbxperm` network on kind v0.32.0 (macOS/arm64,
-kubectl 1.36.1, chart 0.3.1, Besu 26.6.0, `cast` 1.7.1, QBFT, free gas) with
+Verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64, foundry `cast`,
+QBFT, free gas) against a freshly-installed `sbxperm` network with
 `allowlist=[0x57f2…]` (treasury):
 
 | Step | Result |

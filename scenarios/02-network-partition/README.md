@@ -84,19 +84,19 @@ four validators.
 Both engines behaved exactly as hypothesised — the partition halted the chain at
 the last committed block with **no fork**, every pod stayed `Running`/`Ready`, and
 the network recovered automatically on heal with no pod restart and no divergence.
-Recorded on kind v0.32.0 (macOS/arm64, kubectl 1.36.1, **chart 0.2.3**, Besu
-26.6.0, 2s block period, `HALT_WINDOW=45`, split `[1,2] | [3,4]`). The absolute
+Verified on chart **0.3.3** (Besu 26.6.1, kind on macOS/arm64, 2s block period,
+`HALT_WINDOW=45`, split `[1,2] | [3,4]`), one run per engine. The absolute
 recovery seconds are timing-specific (they depend on where the heal lands in the
 current round timer); what transfers is the shape.
 
 | Engine   | Baseline mesh  | Sides agree (no fork) | Pods during halt | Peers v1/v2/v3/v4 | Max round | Recovery after heal |
 | -------- | -------------- | --------------------- | ---------------- | ----------------- | --------- | ------------------- |
-| QBFT     | full `3/3/3/3` | yes (53 = 53)         | all 4 Running    | 1/1/1/1           | 2         | **10s**             |
-| IBFT 2.0 | full `3/3/3/3` | yes (7 = 7)           | all 4 Running    | 1/1/1/1           | 2         | **8s**              |
+| QBFT     | full `3/3/3/3` | yes (74 = 74)         | all 4 Running    | 1/1/1/1           | 2         | **10s**             |
+| IBFT 2.0 | full `3/3/3/3` | yes (6371 = 6371)     | all 4 Running    | 1/1/1/1           | 2         | **6s**              |
 
-Chart 0.2.3 cold-starts to a **full `3/3/3/3` mesh on both engines with no manual
-rolling** (it ships the `publishNotReadyAddresses` fix, below), so the partition
-runs from a real full mesh. The **Peers** column is each validator's
+The chart (≥ 0.2.3) cold-starts to a **full `3/3/3/3` mesh on both engines with
+no manual rolling** (it ships the `publishNotReadyAddresses` fix, below), so the
+partition runs from a real full mesh. The **Peers** column is each validator's
 `net_peerCount` during the halt, in validator-number order `v1/v2/v3/v4`. A healthy
 4-node mesh is 3 peers each; the `[1,2] | [3,4]` split caps every node at its one
 same-side partner, so all four read **`1/1/1/1`** — each side an isolated, still-
@@ -105,7 +105,7 @@ connected pair.
 **QBFT:**
 
 - **Halts, does not split-brain.** With `[1,2] | [3,4]` partitioned the chain froze
-  for the full 45s window; both sides reported the **same** height (53) throughout
+  for the full 45s window; both sides reported the **same** height (74) throughout
   and RPC answered on every node — no fork, nothing to reconcile.
 - **All four pods stayed `Running`.** Kubernetes saw a fully healthy deployment
   while the network was dead. Peer counts collapsed to **1 on every validator**
@@ -124,17 +124,17 @@ connected pair.
 **IBFT 2.0:**
 
 - **Identical invariants — halt, no fork, pods all `Running`.** The chain froze for
-  the full window; both sides stayed at the same height (7) with RPC alive; round
+  the full window; both sides stayed at the same height (6371) with RPC alive; round
   climbed to 2 (`Moved to round 2 which will expire in 40 seconds`).
 - **Peer collapse was `1/1/1/1`**, same as QBFT — from a full baseline mesh each
   validator kept exactly its same-side partner.
-- **Recovery on heal was 8s** — comparable to QBFT's 10s. From a full mesh neither
+- **Recovery on heal was 6s** — comparable to QBFT's 10s. From a full mesh neither
   engine has to re-form peers on heal, so recovery is fast on both; the small gap is
   just where the heal lands in the round timer.
 
 **Consensus comparison.** The behaviour is engine-independent: both halt at the last
 committed block, neither forks, both leave every pod `Running`/`Ready`, both show the
-round-change backoff, and both recover automatically on heal (10s / 8s) with no
+round-change backoff, and both recover automatically on heal (10s / 6s) with no
 restart. As in quorum loss, a longer partition would climb to higher rounds and
 inherit the same superlinear backoff curve scenario 01 measured.
 
@@ -143,7 +143,7 @@ baseline mesh, making the partition read `1/1/0/0` instead of `1/1/1/1` — a
 Kubernetes/P2P timing artifact (not consensus), fixed in 0.2.3 via
 `publishNotReadyAddresses` on the validator Services.
 
-**Peer mesh on heal.** On 0.2.3 the mesh returned to a full `3/3/3/3` on both engines
+**Peer mesh on heal.** The mesh returned to a full `3/3/3/3` on both engines
 within the post-recovery check (~12s after heal). Treat peer count as a topology
 signal, not a liveness one.
 

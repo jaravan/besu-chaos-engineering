@@ -1,7 +1,7 @@
 # Erratic block times / periodic stalls (degraded validator)
 
 > Backed by scenario: [`03-slow-peer`](../scenarios/03-slow-peer/). Verified on
-> **both QBFT and IBFT 2.0** (chart 0.2.3): the cliff
+> **both QBFT and IBFT 2.0** (chart 0.3.3, Besu 26.6.1): the cliff
 > appears once egress latency exceeds `requesttimeoutseconds`, the slow node's
 > proposer slots commit at `Round=1`, and recovery is immediate when the
 > degradation clears.

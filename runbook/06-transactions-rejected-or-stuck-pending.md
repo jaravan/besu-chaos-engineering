@@ -1,7 +1,7 @@
 # Transactions rejected or stuck pending under load
 
 > Backed by scenario: [`06-txpool-flooding`](../scenarios/06-txpool-flooding/).
-> Verified on chart 0.3.1 (Besu 26.6.0, free
+> Verified on chart 0.3.3 (Besu 26.6.1, free
 > gas): a sender's future-nonce queue filled to the per-sender cap (199 accepted,
 > **nonce 200 rejected** with `-32000: nonce is too distant`), filling the gap
 > promoted the whole queue (nonce **0 → 200**), and a zero-balance sender's
@@ -45,7 +45,7 @@ Ordered by frequency in practice:
      before earlier ones confirm, outrunning the 200-wide window even while mining
      is healthy.
 2. **The sender has zero balance.** Besu's
-   [`SenderBalanceChecker`](https://github.com/hyperledger/besu/blob/26.6.0/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/layered/SenderBalanceChecker.java#L86)
+   [`SenderBalanceChecker`](https://github.com/hyperledger/besu/blob/26.6.1/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/layered/SenderBalanceChecker.java#L86)
    — part of the layered **transaction pool** — checks each pending tx's sender
    balance against the chain-head world state and holds back any from a zero-balance
    sender: the tx is admitted to the pool (even ranked in it) but never put in a
@@ -167,7 +167,7 @@ since a node restart also clears the in-memory pool.
 
 The layered-pool defaults referenced above (50 MB/layer, 5000 prioritized, 200
 future-per-sender) are Besu's, from
-[`TransactionPoolConfiguration`](https://github.com/hyperledger/besu/blob/26.6.0/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/TransactionPoolConfiguration.java)
+[`TransactionPoolConfiguration`](https://github.com/hyperledger/besu/blob/26.6.1/ethereum/eth/src/main/java/org/hyperledger/besu/ethereum/eth/transactions/TransactionPoolConfiguration.java)
 (`DEFAULT_PENDING_TRANSACTIONS_LAYER_MAX_CAPACITY_BYTES`,
 `DEFAULT_MAX_PRIORITIZED_TRANSACTIONS`, `DEFAULT_MAX_FUTURE_BY_SENDER`; `LAYERED` is
 `DEFAULT_TX_POOL_IMPLEMENTATION`), pinned to the version this chart runs.
