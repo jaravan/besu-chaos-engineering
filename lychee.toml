@@ -1,0 +1,12 @@
+# lychee link-checker config — used by CI (.github/workflows/ci.yml) and
+# locally:
+#   docker run --rm -v "$PWD:/repo" -w /repo lycheeverse/lychee \
+#     --offline --include-fragments 'README.md' 'scenarios/**/*.md' 'runbook/*.md'
+#
+# --offline on purpose: CI verifies the repo's *internal* cross-links
+# (scenario ↔ runbook ↔ README), which are the links that break on renames.
+# External URLs are excluded so the build never fails on someone else's outage.
+no_progress = true
+
+# The runbook template's scenario link is a deliberate placeholder.
+exclude_path = ["runbook/TEMPLATE.md", "tmp"]

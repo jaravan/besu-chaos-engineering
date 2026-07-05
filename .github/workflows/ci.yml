@@ -1,0 +1,106 @@
+# CI for a repo whose thesis is "verified, reproducible": lint the scripts,
+# verify the docs' internal cross-links, then actually do the thing — spin up
+# kind, install the published chart, and run real scenarios end-to-end.
+#
+# The e2e job deliberately runs the same entrypoints the README gives humans
+# (make install / make scenario-NN): CI is a user of the repo, not a special
+# path. The weekly cron keeps the badge honest against bit-rot — the chart and
+# images are pulled fresh from their registries on every run.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 5 * * 1" # weekly - catches chart/image drift with no code change
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # explicit bash => -o pipefail, so `make … | tee` fails when make fails
+    shell: bash
+
+jobs:
+  lint:
+    name: shellcheck + markdown links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck (errors + warnings gate)
+        run: shellcheck --source-path=. -x --severity=warning scripts/lib.sh scenarios/*/run.sh
+
+      - name: markdown cross-links (offline, fragments included)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --config lychee.toml --offline --include-fragments 'README.md' 'scenarios/**/*.md' 'runbook/*.md'
+          fail: true
+
+  e2e:
+    name: "kind e2e: install + scenarios 01 & 10"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          # context "kind-besu-chaos" - recognized by the repo's own
+          # guard_local_context, exactly as a local run would be
+          cluster_name: besu-chaos
+
+      - name: install besu-sandbox (chart + version pinned by the Makefile)
+        run: |
+          mkdir -p ci-logs
+          make install 2>&1 | tee ci-logs/install.log
+
+      - name: helm test
+        run: make test 2>&1 | tee ci-logs/helm-test.log
+
+      - name: "scenario 01 - validator loss (single loss, then quorum loss + measured RTO)"
+        run: make scenario-01 2>&1 | tee ci-logs/scenario-01.log
+
+      - name: "scenario 10 - genesis config drift (control joiner, then drifted joiner)"
+        run: make scenario-10 2>&1 | tee ci-logs/scenario-10.log
+
+      - name: scenario results -> job summary
+        if: always()
+        run: |
+          {
+            echo "## Scenario results"
+            echo '```'
+            grep -hE '\[(PASS|FAIL)\]' ci-logs/scenario-*.log | sed -E 's/\x1b\[[0-9;]*m//g' \
+              || echo "no scenario results captured"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: cluster forensics
+        if: failure()
+        run: |
+          {
+            echo "=== pods ==="
+            kubectl get pods -A -o wide || true
+            echo "=== recent events (besu) ==="
+            kubectl -n besu get events --sort-by=.lastTimestamp | tail -50 || true
+            for p in $(kubectl -n besu get pods -o name); do
+              echo "=== logs: ${p} ==="
+              kubectl -n besu logs "${p}" --tail=80 --all-containers || true
+            done
+          } 2>&1 | tee ci-logs/forensics.log
+
+      - name: upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs
+          path: ci-logs/
+          retention-days: 14

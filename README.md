@@ -1,5 +1,7 @@
 # Besu Chaos Engineering
 
+[![CI](https://github.com/jaravan/besu-chaos-engineering/actions/workflows/ci.yml/badge.svg)](https://github.com/jaravan/besu-chaos-engineering/actions/workflows/ci.yml)
+
 **Reproducible failure injection and verified recovery for permissioned
 [Hyperledger Besu](https://besu.hyperledger.org/) networks on Kubernetes** —
 every scenario is executed against a real network before its runbook entry is
