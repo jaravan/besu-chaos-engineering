@@ -18,7 +18,7 @@ worse for an operator precisely because nothing pages:
 - A degraded validator is **effectively excluded** from consensus without any
   formal removal — and the moment it is, the network runs at exactly quorum with
   **zero fault tolerance**. One more fault now halts it (the
-  [quorum-loss](../01-validator-loss/#step-2--quorum-loss-chain-halts) cliff edge).
+  [quorum-loss](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts) cliff edge).
 
 The injection shapes **egress only** (the simplest reliable `netem` setup), so it
 models a validator whose _outbound_ path is degraded. A node degraded only on
@@ -28,7 +28,7 @@ and shows the damage mainly when it proposes — a useful distinction in itself.
 **Consensus:** run against both **QBFT** and **IBFT 2.0**. The fault is
 engine-independent — both gate proposer slots on the same `requesttimeoutseconds`
 round timer, so the cliff is the same mechanism measured under
-[quorum loss](../01-validator-loss/#step-2--quorum-loss-chain-halts) — and the
+[quorum loss](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts) — and the
 measured behaviour was near-identical on both (see [Observed](#observed)). Select
 the engine with `CONSENSUS` (it must match the deployed release):
 
@@ -146,12 +146,12 @@ kubectl 1.36.1, **chart 0.2.3**, Besu 26.6.0, 2s block period,
 - **The real danger is silent:** under 3c every pod stayed `Ready` and the chain
   kept moving, so nothing pages — but the network was running at exactly quorum
   with **zero fault tolerance**. One more fault and it is
-  [quorum loss](../01-validator-loss/#step-2--quorum-loss-chain-halts).
+  [quorum loss](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts).
 - **The cliff is set by `requesttimeoutseconds`** (10s here): degradation whose
   added message latency stays well under it is absorbed; degradation that pushes a
   proposer's round-trip past it costs that proposer its slot. This is the same
   round timer whose _backoff_ governs quorum-loss recovery in
-  [scenario 01, Step 2](../01-validator-loss/#step-2--quorum-loss-chain-halts) —
+  [scenario 01, Step 2](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts) —
   here it sets the _tolerance_ edge rather than the recovery curve.
 
 **Consensus comparison.** Engine-independent, as expected: both QBFT and IBFT 2.0
@@ -172,7 +172,7 @@ stamp `Sequence=X, Round=Y`; the runbook diagnosis matches either phrasing.
   fully excluded, and correlate with `requesttimeoutseconds` — at what point does
   its proposer slot _always_ time out?
 - **Degrade two validators** so the healthy set drops below quorum — this should
-  converge on [quorum loss](../01-validator-loss/#step-2--quorum-loss-chain-halts)
+  converge on [quorum loss](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts)
   and is the practical meaning of "no fault tolerance left."
 - **CPU starvation (same symptom, different cause).** Clamp one validator's CPU
   (a tight cgroup limit / privileged ephemeral container writing the cgroup, or a

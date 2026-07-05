@@ -242,7 +242,7 @@ A pass checklist — the reasoning is in [Hypothesis](#hypothesis), the results 
 
 - **4a:** vote-out applies on majority (not at an epoch), set 4→3 with no pause; re-add
   restores it and it proposes again. (Down to 3 = **zero fault tolerance** — the
-  [quorum-loss](../01-validator-loss/#step-2--quorum-loss-chain-halts) cliff is one
+  [quorum-loss](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts) cliff is one
   fault away.)
 - **4b:** a restart empties the node's `getPendingVotes`, but its already-stamped vote
   **(i)** still counts (set 4→5), unless **(ii)** an opposite vote overrides it or
@@ -296,7 +296,7 @@ engines behaved near-identically:
 - **Quorum never broke.** N=4 (quorum 3) → N=3 (quorum 2) → N=4; block production
   was continuous at every step. This is the **safe** way to offboard a member,
   versus the transient quorum-loss halt in
-  [scenario 01, Step 2](../01-validator-loss/#step-2--quorum-loss-chain-halts).
+  [scenario 01, Step 2](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts).
 - **4b — a restart drops intent but does not retract an already-cast vote.** After
   restarting the casting node, `getPendingVotes` on it came back **`{}`** — the
   in-memory proposal was gone, so it stops _re-stamping_. But what about the vote it
@@ -435,7 +435,7 @@ audit every membership change from their own node.
   vote out the slow node and confirm the set shrinks cleanly, turning a silent
   degradation into a clean N=3.
 - **Vote toward sub-quorum** — vote out a _second_ validator and watch the set
-  cross into [quorum loss](../01-validator-loss/#step-2--quorum-loss-chain-halts);
+  cross into [quorum loss](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts);
   the practical meaning of "never remove below your fault-tolerance target."
 
 ## Runbook entries backed by this scenario

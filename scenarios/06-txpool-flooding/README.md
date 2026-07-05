@@ -18,7 +18,7 @@ against the main `sbx` network.
 
 This sandbox runs **free gas** (`min-gas-price=0`), so gas economics are out of the
 picture — but "free gas" does **not** mean "no funded account," which is exactly the
-trap [6c](#6c--accepted--mined-the-zero-balance-sender) exposes.
+trap [6c](#observed) exposes.
 
 The saturate-then-recover mechanic — one sender's future-nonce queue (a gap left at the
 current nonce) and the gap-fill that drains it:

@@ -31,7 +31,7 @@ But — the trap — **QBFT keeps producing blocks** (empty ones) the whole time
 `Ready`, height keeps climbing, consensus is healthy. An operator glancing at "is the
 chain up?" sees green while the network is, in effect, **frozen for users**. This is the
 permissioning-layer analogue of the
-[quorum-loss false comfort](../01-validator-loss/#step-2--quorum-loss-chain-halts) — except
+[quorum-loss false comfort](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts) — except
 here it's the **authorization** layer, not consensus, that is down (and here the chain
 keeps *advancing*, not halting, which makes it even easier to miss).
 

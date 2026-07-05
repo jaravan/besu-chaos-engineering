@@ -12,7 +12,7 @@ sides accept conflicting writes and diverge. **Besu's BFT engines cannot
 split-brain.** Block commitment requires a 2f+1 quorum _and_ both QBFT and
 IBFT 2.0 have immediate finality, so neither 2-validator side can commit a block.
 The expected outcome is therefore the same as quorum loss
-([scenario 01, Step 2](../01-validator-loss/#step-2--quorum-loss-chain-halts)):
+([scenario 01, Step 2](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts)):
 both sides **halt** at the last committed block — no fork, no divergent heights,
 nothing to reconcile when the partition heals.
 
@@ -76,7 +76,7 @@ four validators.
 - `eth_blockNumber` keeps answering on every node — halted ≠ RPC down.
 - All four pods remain `Running`/`Ready` for the entire outage.
 - On heal, automatic recovery (subject to the same BFT round-change backoff
-  measured in [scenario 01, Step 2](../01-validator-loss/#step-2--quorum-loss-chain-halts)
+  measured in [scenario 01, Step 2](../01-validator-loss/README.md#step-2--quorum-loss-chain-halts)
   — recovery is not instant after a long partition).
 
 ## Observed
