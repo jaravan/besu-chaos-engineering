@@ -72,14 +72,15 @@ scenario-04:
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/04-validator-governance/run.sh
 
 # Scenario 05 — duplicate validator key (HA failover gone wrong). A second node
-# runs the same validator key. STEP=1 (devp2p dedupe: copy deployed alongside the
-# live node) and STEP=2 (partition trap: real node isolated first, then the copy)
-# run by default; the copy is shut out at the P2P layer (0 peers / block 0) in both
-# — a deployment-level safety property, not a consensus guarantee (see the README
-# caveat). STEP=3 (opt-in, not in the default) scales the validator StatefulSet to 2:
-# the replica still can't join consensus, but its readiness probe admits it to the
-# RPC Service endpoints un-synced, polluting client reads. TARGET overrides the
-# duplicated validator. CONSENSUS must match the deployed release (qbft | ibft2).
+# runs the same validator key. STEP=1 (copy alongside the LIVE node) shows devp2p
+# dedupe shutting it out (0 peers / block 0). STEP=2 (partition trap: real node
+# isolated first, then the copy) shows the finding — dedupe is conditional on the
+# original being connected, so with it isolated the copy PEERS and TAKES THE
+# PROPOSER SLOT, signing under the shared key (getSignerMetrics; SKIP_DUP=1 runs
+# the isolate-only control that proposes 0). Both run by default. STEP=3 (opt-in)
+# scales the StatefulSet to 2: the copy is deduped (real -0 pod still live) but its
+# readiness probe admits it to the RPC endpoints un-synced, polluting client reads.
+# TARGET overrides the duplicated validator. CONSENSUS must match the release.
 scenario-05:
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) CONSENSUS=$(CONSENSUS) bash scenarios/05-duplicate-validator/run.sh
 

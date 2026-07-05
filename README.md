@@ -118,13 +118,13 @@ Scenario numbers are stable IDs wired into the Makefile and the runbook.
 How a BFT validator set behaves as validators are lost, isolated, degraded, or
 deliberately reconfigured.
 
-| #                                        | Scenario                | Failure injected                                                                                                | Consensus       |
-| ---------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------- |
-| [01](scenarios/01-validator-loss/)       | Validator loss          | One validator down (network healthy), then two — quorum broken, verified halt, measured RTO                     | QBFT · IBFT 2.0 |
-| [02](scenarios/02-network-partition/)    | Network partition       | iptables split `[1,2] \| [3,4]`: neither side has quorum, both halt at the same block, every pod still Ready    | QBFT · IBFT 2.0 |
-| [03](scenarios/03-slow-peer/)            | Slow peer               | `tc netem` degrades one validator past the round-change timeout — silent loss of all fault tolerance            | QBFT · IBFT 2.0 |
-| [04](scenarios/04-validator-governance/) | Validator governance    | Vote a member out of the validator set and back in at runtime — no restart, no genesis change                   | QBFT · IBFT 2.0 |
-| [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | A second node runs the same validator key (HA gone wrong): the copy never joins consensus — with documented limits | QBFT · IBFT 2.0 |
+| #                                        | Scenario                | Failure injected                                                                                                   | Consensus       |
+| ---------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------- |
+| [01](scenarios/01-validator-loss/)       | Validator loss          | One validator down (network healthy), then two — quorum broken, verified halt, measured RTO                        | QBFT · IBFT 2.0 |
+| [02](scenarios/02-network-partition/)    | Network partition       | iptables split `[1,2] \| [3,4]`: neither side has quorum, both halt at the same block, every pod still Ready       | QBFT · IBFT 2.0 |
+| [03](scenarios/03-slow-peer/)            | Slow peer               | `tc netem` degrades one validator past the round-change timeout — silent loss of all fault tolerance               | QBFT · IBFT 2.0 |
+| [04](scenarios/04-validator-governance/) | Validator governance    | Vote a member out of the validator set and back in at runtime — no restart, no genesis change                      | QBFT · IBFT 2.0 |
+| [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | A second node runs the same validator key (HA gone wrong): dedupe shuts the copy out only while the original is connected — isolate the original and the copy takes the proposer slot, signing under the shared key | QBFT · IBFT 2.0 |
 
 ### Transaction layer
 

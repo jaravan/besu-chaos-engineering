@@ -35,11 +35,32 @@ STEPS=(${STEP:-1 2})                                  # which steps to run (defa
 TARGET="${TARGET:-2}"                                 # validator to duplicate
 DUP_POD="${DUP_POD:-chaos-dup-validator${TARGET}}"
 KEY_SECRET="${KEY_SECRET:-${RELEASE}-validator${TARGET}-key}"
-BESU_IMG="${BESU_IMG:-hyperledger/besu:26.6.0}"
 OBSERVE="${OBSERVE:-60}"
 SETTLE="${SETTLE:-12}"
 
 TARGET_POD="${RELEASE}-validator${TARGET}-0"
+# Match the network's Besu version exactly (read from the running target), so the
+# duplicate never straddles a version boundary. Override with BESU_IMG.
+BESU_IMG="${BESU_IMG:-$(kubectl -n "${NAMESPACE}" get pod "${TARGET_POD}" -o jsonpath='{.spec.containers[0].image}' 2>/dev/null)}"
+BESU_IMG="${BESU_IMG:-hyperledger/besu:26.6.1}"
+# The duplicated validator's on-chain address, derived from the shared node key
+# (the key secret holds only `nodekey`, no address). Used to detect
+# double-signing via getSignerMetrics: any block this address proposes while the
+# real node is isolated (STEP 2) was proposed by the duplicate. Resolved lazily
+# in STEP 2 (needs the foundry caster), cached here.
+TARGET_ADDR=""
+
+# resolve_target_addr — derive the target validator's address from its node key
+# via `cast` (the QBFT/IBFT validator identity is the secp256k1 address of the
+# node key). Sets TARGET_ADDR; needs the caster pod.
+resolve_target_addr() {
+  [[ -n "${TARGET_ADDR}" ]] && return 0
+  local nodekey
+  nodekey="$(kubectl -n "${NAMESPACE}" get secret "${KEY_SECRET}" -o jsonpath='{.data.nodekey}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+  [[ -n "${nodekey}" ]] || { log "could not read nodekey from ${KEY_SECRET}"; return 0; }
+  ensure_caster
+  TARGET_ADDR="$(cast_in "cast wallet address --private-key 0x${nodekey}" 2>/dev/null | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]' || true)"
+}
 
 # Indexed arrays keyed by validator number (1..4) — macOS bash 3.2 has no
 # associative arrays (declare -A); follow the scenario-02 pattern.
@@ -141,6 +162,21 @@ report_duplicate() {
   DUP_PEERS="${dup_peers}" DUP_HEIGHT="${dup_height}" ROUND_GT0="${rc}"
 }
 
+# proposed_by_target_since <from-block-decimal> <query-svc> — how many blocks the
+# TARGET address proposed from <from-block> to head, per a healthy validator's
+# getSignerMetrics. This is the authoritative double-sign signal in STEP 2: with
+# the real node isolated, any block proposed by its address came from the
+# duplicate. (A log grep is unreliable — Besu has no single "produced" line.)
+proposed_by_target_since() {
+  local svc="$2" from_hex hex
+  [[ -n "${TARGET_ADDR}" ]] || { echo '?'; return 0; }
+  from_hex="$(printf '0x%x' "$1")"
+  hex="$(rpc "$(consensus_rpc_ns)_getSignerMetrics" "[\"${from_hex}\", \"latest\"]" "${svc}" \
+    | tr '}' '\n' | grep -i "${TARGET_ADDR#0x}" | grep -o 'proposedBlockCount":"0x[0-9a-fA-F]*"' \
+    | grep -o '0x[0-9a-fA-F]*' | head -1)"
+  [[ -n "${hex}" ]] && printf '%d\n' "${hex}" || echo 0
+}
+
 remove_duplicate() {
   kubectl -n "${NAMESPACE}" delete pod "${DUP_POD}" --ignore-not-found --wait=true --grace-period=1 >/dev/null 2>&1 || true
 }
@@ -167,6 +203,7 @@ isolate_target() {                 # $1 = add|del
 cleanup() {
   remove_duplicate
   cleanup_probe
+  cleanup_caster
   # Safety net: if we exited while the target is partitioned, recreating the
   # affected pods gives them a fresh netns with no DROP rules — guarantees the
   # network is never left partitioned by a failed run.
@@ -215,15 +252,59 @@ step_partition_trap() {   # STEP 2: partition trap
   sleep "${SETTLE}"
   log "real validator${TARGET} peers=$(peer_count "$(validator_svc "${TARGET}")") (expect drop toward 0)"
 
+  # Baseline for the double-sign check: the head as a HEALTHY validator sees it,
+  # captured before the duplicate can propose anything. Any block validator${TARGET}'s
+  # ADDRESS proposes from here on (while the real node is isolated) is the duplicate.
+  resolve_target_addr
+  local base_h; base_h="$(block_height "$(validator_svc 1)")"
+
+  # CONTROL (SKIP_DUP=1): isolate the real node but deploy NO duplicate, and
+  # confirm the target address proposes 0 blocks — i.e. the iptables isolation
+  # genuinely cuts the real node out (its slots round-change). This is the
+  # disambiguation for the finding below: with the control at 0 and the
+  # duplicate run > 0, the extra blocks can only be the duplicate.
+  if [[ -n "${SKIP_DUP:-}" ]]; then
+    log "CONTROL: no duplicate deployed; observing ${OBSERVE}s whether the ISOLATED real node still proposes"
+    sleep "${OBSERVE}"
+    local ctl_proposed rc_ctl
+    ctl_proposed="$(proposed_by_target_since "${base_h:-0}" "$(validator_svc 1)")"
+    rc_ctl="$(kubectl -n "${NAMESPACE}" logs "${RELEASE}-validator1-0" --since="$(( OBSERVE + 35 ))s" 2>/dev/null | grep 'Importing proposed block' | grep -cvE 'Round=0' || true)"
+    log "CONTROL: validator${TARGET}'s address proposed ${ctl_proposed} block(s) while isolated with NO duplicate (round>0=${rc_ctl})"
+    [[ "${ctl_proposed}" == "0" ]] \
+      && pass "05/2 CONTROL: isolation is effective — the real node proposed 0 blocks while cut off (its slots round-changed); any blocks in the duplicate run are the copy's" \
+      || fail "05/2 CONTROL: isolated real node still proposed ${ctl_proposed} block(s) — isolation leaked, the partition-trap finding would be unsound"
+    log "=== heal: flush DROP rules, restore validator${TARGET} ==="
+    isolate_target del
+    PARTITIONED=0
+    sleep "${SETTLE}"
+    assert_chain_advancing 60
+    return 0
+  fi
+  log "double-sign baseline: head=${base_h:-?} at validator1; target address=${TARGET_ADDR:-unknown}"
+
   log "deploying duplicate validator${TARGET} (same key) while the real node is isolated…"
   deploy_duplicate
   wait_duplicate_up
   log "observing ${OBSERVE}s: can the duplicate take the isolated node's slot?"
   sleep "${OBSERVE}"
   report_duplicate "STEP 2"
-  [[ "${DUP_PEERS}" == "0" && "${DUP_HEIGHT}" == "0" ]] \
-    && pass "05/2: partition trap — duplicate still peers=0 height=0; peers dial the StatefulSet DNS -> real pod IP, not the copy (round>0=${ROUND_GT0} from the missing validator, not double-signing)" \
-    || log "05/2: duplicate not fully isolated (peers=${DUP_PEERS} height=${DUP_HEIGHT}); inspect logs above"
+  # Authoritative double-sign check: over the isolation window, how many blocks
+  # did the target ADDRESS propose (per a healthy validator's getSignerMetrics)?
+  # Real node is isolated, so any such block was proposed by the DUPLICATE.
+  local tgt_proposed; tgt_proposed="$(proposed_by_target_since "${base_h:-0}" "$(validator_svc 1)")"
+  log "STEP 2: blocks proposed by validator${TARGET}'s address since baseline (=duplicate, real node isolated): ${tgt_proposed}"
+  # Three outcomes:
+  #  - shut out at P2P (peers 0 / block 0): copy never reached the mesh (old-chart result);
+  #  - joined the mesh as a FOLLOWER (peers>0) but proposed 0 blocks: syncs, never signs;
+  #  - proposed >0 blocks under the shared key while peered: genuine DOUBLE-SIGNING.
+  if [[ "${DUP_PEERS}" == "0" && "${DUP_HEIGHT}" == "0" ]]; then
+    pass "05/2: partition trap — duplicate shut out at P2P (peers=0 height=0); round>0=${ROUND_GT0} is the missing validator, not double-signing"
+  elif [[ "${tgt_proposed}" == "0" ]]; then
+    pass "05/2: partition trap — duplicate PEERED and synced as a FOLLOWER (peers=${DUP_PEERS} height=${DUP_HEIGHT}) but proposed 0 blocks under validator${TARGET}'s key — it never signs as the validator; round>0=${ROUND_GT0} is the isolated real node's slots round-changing"
+  else
+    log "05/2: FINDING — duplicate PROPOSED ${tgt_proposed} block(s) under validator${TARGET}'s key while the real node was isolated (peers=${DUP_PEERS} height=${DUP_HEIGHT}): the copy took over the isolated validator's slot — active participation under one key, not merely a follower. Consensus did not halt or fork, but this is the boundary the caveat describes, now reached WITHOUT the manual DNAT the old chart needed."
+    pass "05/2: partition trap characterized — duplicate proposed ${tgt_proposed} block(s) (took the isolated slot); network recovered on heal below"
+  fi
 
   log "=== heal: remove duplicate, flush DROP rules, restore validator${TARGET} ==="
   remove_duplicate
