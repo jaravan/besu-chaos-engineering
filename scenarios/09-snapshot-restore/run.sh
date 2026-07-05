@@ -24,6 +24,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh
 
+# shellcheck disable=SC2206 # word-splitting is the interface: STEP is a space-separated list
 STEPS=(${STEP:-1 2 3})                        # which steps to run (default all)
 TARGET_VALIDATOR="${TARGET_VALIDATOR:-4}"     # must be beyond quorum (any one of 4)
 TARGET_STS="${RELEASE}-validator${TARGET_VALIDATOR}"

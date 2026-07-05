@@ -27,6 +27,7 @@ cd "$(dirname "$0")/../.."
 source scripts/lib.sh
 
 NS="$(consensus_rpc_ns)"               # qbft | ibft — RPC namespace for the deployed engine
+# shellcheck disable=SC2206 # word-splitting is the interface: a space-separated list
 VOTERS=(${VOTERS:-1 2 3})              # 3 of 4 = majority for N=4; each casts on its OWN node
 APPLY_TIMEOUT="${APPLY_TIMEOUT:-60}"   # seconds to wait for a vote to apply at a block boundary
 QUERY_SVC="$(validator_svc 1)"         # read the set from validator1 — stays a validator throughout

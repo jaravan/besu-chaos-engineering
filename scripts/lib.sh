@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helpers for chaos scenarios. Source from run.sh; requires bash.
 
 NAMESPACE="${NAMESPACE:-besu}"

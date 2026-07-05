@@ -25,6 +25,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh
 
+# shellcheck disable=SC2206 # word-splitting is the interface: STEP is a space-separated list
 STEPS=(${STEP:-1 2})                          # which steps to run (default both)
 JOINER_POD="${JOINER_POD:-chaos-joiner}"
 DRIFT_GENESIS_CM="${DRIFT_GENESIS_CM:-chaos-drift-genesis}"

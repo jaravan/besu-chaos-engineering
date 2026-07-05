@@ -30,6 +30,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh
 
+# shellcheck disable=SC2206 # word-splitting is the interface: STEP is a space-separated list
 STEPS=(${STEP:-1 2})                                  # which steps to run (default both)
 TARGET="${TARGET:-2}"                                 # validator to duplicate
 DUP_POD="${DUP_POD:-chaos-dup-validator${TARGET}}"
@@ -267,9 +268,9 @@ step_scale_replica() {    # the literal "bump replicas" HA accident (opt-in)
     || log "${rep_pod} is NOT in ${UNIFIED_SVC} endpoints (readiness kept it out)"
 
   # Demonstrate the read-path pollution: sample the unified service and count stale/zero reads.
-  local head samples=12 stale=0 j hx h
+  local head samples=12 stale=0 hx h
   head="$(block_height "${read_svc}")"
-  for j in $(seq 1 "${samples}"); do
+  for _ in $(seq 1 "${samples}"); do
     hx="$(rpc eth_blockNumber '[]' "${UNIFIED_SVC}" | rpc_result)"
     [[ -n "${hx}" ]] || continue
     h="$(printf '%d' "${hx}" 2>/dev/null || echo 0)"

@@ -12,7 +12,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh
 
+# shellcheck disable=SC2206 # word-splitting is the interface: space-separated lists
 GROUP_A=(${GROUP_A:-1 2})   # side we add the DROP rules on
+# shellcheck disable=SC2206
 GROUP_B=(${GROUP_B:-3 4})   # IPs blocked from group A
 HALT_WINDOW="${HALT_WINDOW:-45}"
 

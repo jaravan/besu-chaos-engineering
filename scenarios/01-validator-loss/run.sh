@@ -37,6 +37,7 @@ source scripts/lib.sh
 
 STEP="${STEP:-default}"
 TARGET_VALIDATOR="${TARGET_VALIDATOR:-2}"        # step 1: single target
+# shellcheck disable=SC2206 # word-splitting is the interface: a space-separated list
 TARGET_VALIDATORS=(${TARGET_VALIDATORS:-2 3})    # step 2: the pair taken down
 OUTAGE_WINDOW="${OUTAGE_WINDOW:-30}"             # step 1b sustained outage
 HALT_WINDOW="${HALT_WINDOW:-45}"                 # step 2 halt observation
