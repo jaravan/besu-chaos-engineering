@@ -152,6 +152,7 @@ rpc_hex_retry() {
 }
 
 # block_height [host] — decimal block number, empty string on RPC failure
+# shellcheck disable=SC2120 # scenario scripts pass a host; in-lib callers use the default (SC2120 fires on older shellcheck, e.g. CI's)
 block_height() {
   local hex
   hex="$(rpc_hex_retry eth_blockNumber "${1:-${UNIFIED_SVC}}")" || return 0
