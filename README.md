@@ -62,6 +62,41 @@ make scenario-01    # validator loss (STEP=1 single / STEP=2 quorum / both)
 make cluster-down   # tear down the kind cluster (no-op if you brought your own)
 ```
 
+## Sample run
+
+What a scenario actually prints — an unedited excerpt from a real
+`make scenario-01` run (kind, chart 0.3.1, QBFT, 2s blocks): one validator
+lost while the network stays healthy, then two — quorum broken, a verified
+halt, and a measured recovery.
+
+```text
+[03:57:24] === baseline (consensus=qbft) ===
+[PASS] chain advancing (3497 -> 3498 in 2s)
+[03:57:26] === STEP 1: single validator loss (target validator 2) ===
+[03:57:26] --- 1a: ungraceful kill (force delete sbx-validator2-0) ---
+[03:57:26] pod force-deleted at height 3498; chain must keep advancing while it restarts
+[PASS] chain advancing (3498 -> 3500 in 2s)
+[03:57:57] sbx-validator2-0 Ready again after 31s
+[PASS] 1a: restarted validator rejoined (peers=3, height=3511)
+...
+[03:59:17] === STEP 2: quorum loss (scale validators 2 3 to 0) ===
+[03:59:18] both validators gone; expecting halt
+[PASS] chain halted at block 3531 for 45s
+[04:00:08] RPC reads still served during halt: height=3531, validator set query answered
+[04:00:08] surviving validator1 peer count during outage: 1
+[04:00:08] --- recover: scale both back, measure RTO ---
+[04:00:28] both pods Ready after 20s; waiting for first block above 3531
+[PASS] halt duration 71s -> first new block 60s after pods Ready (RTO from scale-up: 80s)
+[04:01:33] --- post-recovery: steady state ---
+[PASS] chain advancing (3532 -> 3533 in 2s)
+[04:01:36] === scenario 01 complete ===
+```
+
+The two lines that matter: the chain **halts** the moment quorum is lost —
+while every pod stays `Ready` and RPC keeps answering (the false comfort this
+repo keeps returning to) — and recovery is **measured**, not assumed
+(`RTO from scale-up: 80s`).
+
 ## Scenarios
 
 Each scenario lives in its own directory under [scenarios/](scenarios/) and
@@ -81,13 +116,13 @@ Scenario numbers are stable IDs wired into the Makefile and the runbook.
 How a BFT validator set behaves as validators are lost, isolated, degraded, or
 deliberately reconfigured.
 
-| #                                        | Scenario                | Failure injected                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Consensus       |
-| ---------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- |
-| [01](scenarios/01-validator-loss/)       | Validator loss          | Two steps along the fault threshold: one validator down (N-1, network stays healthy), then two down (f=1 exceeded → chain halts, RTO grows superlinearly with halt)                                                                                                                                                                                                                                                                                                                                                                                                                                                            | QBFT · IBFT 2.0 |
-| [02](scenarios/02-network-partition/)    | Network partition       | Split the validators `[1,2] \| [3,4]` with iptables DROP rules so neither side has quorum: both sides halt at the same block (no split-brain) while every pod stays Running/Ready; heal by flushing the rules                                                                                                                                                                                                                                                                                                                                                                                                                  | QBFT · IBFT 2.0 |
-| [03](scenarios/03-slow-peer/)            | Slow peer               | Degrade one validator's egress with `tc netem` (400ms; 800ms+25% loss; 12s past the round-change timeout). Chain keeps producing on 3-of-4, but past `requesttimeoutseconds` the slow node's proposer slots round-change — a silent degradation that leaves zero fault tolerance, every pod still Ready                                                                                                                                                                                                                                                                                                                        | QBFT · IBFT 2.0 |
-| [04](scenarios/04-validator-governance/) | Validator governance    | Vote a member out of the validator set and back in at runtime via `<engine>_proposeValidatorVote` (majority of current validators, no restart, no genesis change). Chain keeps producing at N=3 while the member is out; the removed node stays Running as a non-proposing peer. The durable counterpart to scenario 01's transient loss                                                                                                                                                                                                                                                                                       | QBFT · IBFT 2.0 |
-| [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | Run a second node carrying the same validator key (misconfigured HA failover). Deploy the duplicate alongside the live node (devp2p identity dedupe shuts it out), then isolate the real node first and try again (StatefulSet DNS still anchors peers to the real pod); an opt-in third step scales the validator StatefulSet to 2. The duplicate never joins consensus — 0 peers, block 0 — a deployment-level safety property, not a protocol guarantee against equivocation; a StatefulSet-scaled copy does, though, slip into the RPC Service endpoints un-synced and pollute client reads. No incident, no runbook entry | QBFT · IBFT 2.0 |
+| #                                        | Scenario                | Failure injected                                                                                                | Consensus       |
+| ---------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------- | --------------- |
+| [01](scenarios/01-validator-loss/)       | Validator loss          | One validator down (network healthy), then two — quorum broken, verified halt, measured RTO                     | QBFT · IBFT 2.0 |
+| [02](scenarios/02-network-partition/)    | Network partition       | iptables split `[1,2] \| [3,4]`: neither side has quorum, both halt at the same block, every pod still Ready    | QBFT · IBFT 2.0 |
+| [03](scenarios/03-slow-peer/)            | Slow peer               | `tc netem` degrades one validator past the round-change timeout — silent loss of all fault tolerance            | QBFT · IBFT 2.0 |
+| [04](scenarios/04-validator-governance/) | Validator governance    | Vote a member out of the validator set and back in at runtime — no restart, no genesis change                   | QBFT · IBFT 2.0 |
+| [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | A second node runs the same validator key (HA gone wrong): the copy never joins consensus — with documented limits | QBFT · IBFT 2.0 |
 
 ### Transaction layer
 
@@ -95,11 +130,11 @@ What gates, strands, or rejects a transaction while consensus stays healthy. The
 scenarios are engine-agnostic — they exercise the transaction pipeline, not the
 validator set.
 
-| #                                         | Scenario                  | Failure injected                                                                                                                                                                                                                                                                                                                                                                                                                           | Consensus      |
-| ----------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
-| [06](scenarios/06-txpool-flooding/)       | Transaction pool flooding | Saturate one sender's future-nonce queue (gap at the current nonce) until Besu rejects with `-32000` (not a silent drop), then fill the gap and watch the 199 queued txs promote and mine. A zero-balance sender's tx is accepted but never mined until the account holds any balance (1 wei is enough) — on a free-gas chain it's the empty account, not the gas price, that strands it. Reads and block production unaffected throughout | Any (tx-layer) |
-| [07](scenarios/07-account-permissioning/) | Account permissioning     | Spin up its own permissioned network and show a funded-but-not-allowlisted sender is DENIED at submission (`-32007`, never pooled, nonce unmoved) — the opposite shape to 06's accepted-then-stranded balance gate. `perm_addAccountsToAllowlist` on every validator lets it mine; removing it denies again. The two gates a new participant must clear: allowlisted **and** funded                                                        | Any (tx-layer) |
-| [08](scenarios/08-permissioning-outage/)  | Permissioning outage      | Empty the allowlist on every validator (a wrong admin change / bad deploy) and watch **every** sender get `-32007` while QBFT keeps producing empty blocks — pods Ready, height climbing, network frozen for users. The authorization-layer false comfort, worse than quorum loss because the chain doesn't even halt. Recover via the `perm_*` RPC escape hatch, no restart                                                               | Any (tx-layer) |
+| #                                         | Scenario                  | Failure injected                                                                                                  | Consensus      |
+| ----------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ | -------------- |
+| [06](scenarios/06-txpool-flooding/)       | Transaction pool flooding | Saturate a sender's future-nonce queue until Besu rejects (`-32000`), then fill the gap and watch the queue mine  | Any (tx-layer) |
+| [07](scenarios/07-account-permissioning/) | Account permissioning     | A funded but not-allowlisted sender is denied at submission (`-32007`); allowlisting via `perm_*` RPC lets it mine | Any (tx-layer) |
+| [08](scenarios/08-permissioning-outage/)  | Permissioning outage      | Empty the allowlist: every sender denied while empty blocks keep flowing — network "up", frozen for users         | Any (tx-layer) |
 
 ### State & storage
 
@@ -107,9 +142,9 @@ Whether a node can be rebuilt from what's on disk — and which backups deserve
 the trust. These scenarios operate on one node's data volume; consensus stays
 healthy throughout (the target is beyond quorum).
 
-| #                                    | Scenario         | Failure injected                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Consensus           |
-| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| [09](scenarios/09-snapshot-restore/) | Snapshot restore | Restore a validator from a data-volume snapshot, three ways: cold (node stopped — crash-consistent by construction, the procedure to rely on), hot while idle (usually reopens via RocksDB WAL recovery), and hot under sustained tx load (a file-walk copy is a _smeared_ capture that can fail to reopen). A failed hot restore triggers the runbook recovery — wipe + resync — automatically, so the loop closes either way. Also retires the GoQuorum "freezer desync" fear: Bonsai is one RocksDB, no two-store split | Any (storage-layer) |
+| #                                    | Scenario         | Failure injected                                                                                                        | Consensus           |
+| ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| [09](scenarios/09-snapshot-restore/) | Snapshot restore | Restore a validator from cold, hot-idle, and hot-under-load snapshots; a failed hot restore auto-recovers via wipe + resync | Any (storage-layer) |
 
 ### Configuration & onboarding
 
@@ -117,9 +152,9 @@ What keeps a correctly-running node from ever joining the network. In a
 consortium each member deploys their own node, so configuration drifts — and
 the gate sits below consensus, at the devp2p/eth handshake.
 
-| #                                        | Scenario               | Failure injected                                                                                                                                                                                                                                                                                                                                                                              | Consensus             |
-| ---------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| [10](scenarios/10-genesis-config-drift/) | Genesis / config drift | Boot a joiner node from a drifted genesis (`chainId` changed): every peer rejects it at the eth handshake, so it sits at block 0 with no useful peers — the everyday "new member's node won't sync" incident — while the network is completely unaffected. A control arm first proves the same joiner with the correct genesis full-syncs to head, isolating the genesis as the only variable | Any (handshake layer) |
+| #                                        | Scenario               | Failure injected                                                                                         | Consensus             |
+| ---------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------- | --------------------- |
+| [10](scenarios/10-genesis-config-drift/) | Genesis / config drift | A joiner with a drifted genesis is rejected at the eth handshake — stuck at block 0, network unaffected  | Any (handshake layer) |
 
 ## Runbook
 
