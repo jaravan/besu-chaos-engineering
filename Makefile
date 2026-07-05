@@ -5,7 +5,7 @@ CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
 CHART_VERSION ?= 0.3.1
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
-.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05 scenario-06 scenario-07 scenario-08 scenario-09
+.PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05 scenario-06 scenario-07 scenario-08 scenario-09 scenario-10
 
 cluster-up:
 	kind get clusters | grep -qx $(KIND_CLUSTER) || kind create cluster --name $(KIND_CLUSTER)
@@ -117,3 +117,13 @@ scenario-08:
 # producing at 3-of-4 throughout. Engine-independent (storage layer).
 scenario-09:
 	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) bash scenarios/09-snapshot-restore/run.sh
+
+# Scenario 10 — genesis / config drift (onboarding layer). A standalone joiner
+# node dials the running network: STEP=1 (control) boots it from the real
+# genesis and it must full-sync to head; STEP=2 (drift) boots it from the same
+# genesis with chainId changed (DRIFT_CHAINID, default 1337001) and it must stay
+# at block 0 with no useful peers — rejected at the eth handshake — while the
+# network is unaffected. Both by default. Image and bootnodes are read from the
+# live validator1 pod. Engine-independent (handshake layer).
+scenario-10:
+	NAMESPACE=$(NAMESPACE) RELEASE=$(RELEASE) bash scenarios/10-genesis-config-drift/run.sh

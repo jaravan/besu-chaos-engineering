@@ -107,6 +107,16 @@ healthy throughout (the target is beyond quorum).
 | ------------------------------------ | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
 | [09](scenarios/09-snapshot-restore/) | Snapshot restore | Restore a validator from a data-volume snapshot, three ways: cold (node stopped — crash-consistent by construction, the procedure to rely on), hot while idle (usually reopens via RocksDB WAL recovery), and hot under sustained tx load (a file-walk copy is a _smeared_ capture that can fail to reopen). A failed hot restore triggers the runbook recovery — wipe + resync — automatically, so the loop closes either way. Also retires the GoQuorum "freezer desync" fear: Bonsai is one RocksDB, no two-store split | Any (storage-layer) |
 
+### Configuration & onboarding
+
+What keeps a correctly-running node from ever joining the network. In a
+consortium each member deploys their own node, so configuration drifts — and
+the gate sits below consensus, at the devp2p/eth handshake.
+
+| #                                        | Scenario               | Failure injected                                                                                                                                                                                                                                                                                                                                                                                              | Consensus             |
+| ---------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| [10](scenarios/10-genesis-config-drift/) | Genesis / config drift | Boot a joiner node from a drifted genesis (`chainId` changed): every peer rejects it at the eth handshake, so it sits at block 0 with no useful peers — the everyday "new member's node won't sync" incident — while the network is completely unaffected. A control arm first proves the same joiner with the correct genesis full-syncs to head, isolating the genesis as the only variable | Any (handshake layer) |
+
 ## Runbook
 
 [runbook/](runbook/) holds incident entries in a fixed format — symptom, likely
@@ -125,6 +135,7 @@ verified, so the runbook stays grounded in observed behaviour rather than theory
 | [Account not authorized to send](runbook/07-account-not-authorized-to-send.md)                 | [07](scenarios/07-account-permissioning/)      |
 | [Network "up" but no transactions](runbook/08-network-up-but-no-transactions.md)               | [08](scenarios/08-permissioning-outage/)       |
 | [Restoring a node from a volume snapshot](runbook/09-node-restore-from-volume-snapshot.md)     | [09](scenarios/09-snapshot-restore/)           |
+| [New/member node won't sync (genesis mismatch)](runbook/10-member-node-wont-sync-genesis-mismatch.md) | [10](scenarios/10-genesis-config-drift/) |
 
 ## Safety
 

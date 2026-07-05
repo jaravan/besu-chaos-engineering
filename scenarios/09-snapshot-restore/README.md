@@ -232,6 +232,6 @@ cycle and returned to a full `3/3/3/3` mesh at a common height after each.
   cloud volume snapshot), restore from a `VolumeSnapshot` instead of a tar —
   the crash-consistent class the smear arms deliberately under-approximate.
 
-## Runbook entries fed by this scenario
+## Runbook entries backed by this scenario
 
 - [Restoring a node from a volume snapshot](../../runbook/09-node-restore-from-volume-snapshot.md)
