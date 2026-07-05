@@ -2,7 +2,7 @@ KIND_CLUSTER ?= besu-chaos
 NAMESPACE    ?= besu
 RELEASE      ?= sbx
 CHART        ?= oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox
-CHART_VERSION ?= 0.3.1
+CHART_VERSION ?= 0.3.2
 CONSENSUS    ?= qbft   # qbft | ibft2 — consensus engine to deploy/target
 
 .PHONY: cluster-up cluster-down install uninstall test scenario-01 scenario-02 scenario-03 scenario-04 scenario-05 scenario-06 scenario-07 scenario-08 scenario-09 scenario-10
@@ -31,6 +31,8 @@ install:
 uninstall:
 	helm uninstall $(RELEASE) -n $(NAMESPACE)
 
+# --logs needs chart >= 0.3.2: its test pod survives success
+# (hook-delete-policy before-hook-creation), so helm can fetch the logs.
 test:
 	helm test $(RELEASE) -n $(NAMESPACE) --timeout 300s --logs
 

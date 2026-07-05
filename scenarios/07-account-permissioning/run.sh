@@ -15,7 +15,7 @@ cd "$(dirname "$0")/../.."
 export NAMESPACE="${PERM_NAMESPACE:-besu-perm}"
 export RELEASE="${PERM_RELEASE:-sbxperm}"
 CHART="${CHART:-oci://ghcr.io/jaravan/besu-helmcharts/besu-sandbox}"
-CHART_VERSION="${CHART_VERSION:-0.3.1}"
+CHART_VERSION="${CHART_VERSION:-0.3.2}"
 source scripts/lib.sh
 
 RPC_URL="http://${UNIFIED_SVC}:${RPC_PORT}"
