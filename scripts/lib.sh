@@ -98,7 +98,11 @@ cast_in() { kubectl -n "${NAMESPACE}" exec "${CASTER_POD}" -- sh -c "$1"; }
 # added from a privileged ephemeral debug container that shares the target pod's
 # netns (scenario 02 uses iptables, scenario 03 uses tc netem).
 NETSHOOT_IMG="${NETSHOOT_IMG:-nicolaka/netshoot}"
-NETNS_CTR="${NETNS_CTR:-chaos-net}"
+# Per-run unique name: ephemeral containers can neither be removed nor
+# restarted once terminated, so a leftover chaos-net from an earlier scenario
+# run (its sleep expired) would silently block re-attaching under the same
+# name. Old ones linger in the pod spec until the pod restarts — harmless.
+NETNS_CTR="${NETNS_CTR:-chaos-net-$(date +%s)}"
 
 # netns_container_running <pod> — prints the debug container's startedAt if up
 netns_container_running() {
@@ -123,6 +127,20 @@ ensure_netns_container() {
 # netns <pod> <sh-command> — run a command in the pod's netns (iptables, tc, …)
 netns() {
   kubectl -n "${NAMESPACE}" exec "$1" -c "${NETNS_CTR}" -- sh -c "$2"
+}
+
+# ensure_namespace_ready [ns] — a namespace left Terminating by a previous
+# run's teardown (scenarios 07/08 delete theirs with --wait=false) refuses new
+# content, which breaks a back-to-back install. Wait out the deletion; leave a
+# healthy existing namespace (e.g. KEEP_NETWORK=1) untouched.
+ensure_namespace_ready() {
+  local ns="${1:-${NAMESPACE}}" phase
+  phase="$(kubectl get namespace "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+  if [[ "${phase}" == "Terminating" ]]; then
+    log "namespace ${ns} is Terminating from a previous run — waiting for deletion to finish"
+    kubectl wait --for=delete "namespace/${ns}" --timeout=180s >/dev/null \
+      || fail "namespace ${ns} is stuck Terminating — inspect and delete it, then re-run"
+  fi
 }
 
 # rpc <method> <params-json> [host]  — host defaults to the unified RPC service

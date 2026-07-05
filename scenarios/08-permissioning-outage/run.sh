@@ -60,6 +60,7 @@ guard_local_context        # refuse to run outside a local/disposable cluster
 trap cleanup EXIT
 
 log "=== install permissioned network: ${RELEASE} (chart ${CHART_VERSION}) in ns ${NAMESPACE} ==="
+ensure_namespace_ready
 helm upgrade --install "${RELEASE}" "${CHART}" --version "${CHART_VERSION}" \
   -n "${NAMESPACE}" --create-namespace \
   --set permissioning.accounts.enabled=true \
