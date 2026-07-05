@@ -1,7 +1,11 @@
 # Besu Chaos Engineering
 
-Chaos engineering suite and tested incident runbook for Hyperledger Besu
-consortium networks.
+**Reproducible failure injection and verified recovery for permissioned
+[Hyperledger Besu](https://besu.hyperledger.org/) networks on Kubernetes** —
+every scenario is executed against a real network before its runbook entry is
+written. The operational companion to
+[besu-sandbox](https://github.com/jaravan/besu-helmcharts): deploy → break →
+diagnose → recover.
 
 ## What this is
 
@@ -113,8 +117,8 @@ What keeps a correctly-running node from ever joining the network. In a
 consortium each member deploys their own node, so configuration drifts — and
 the gate sits below consensus, at the devp2p/eth handshake.
 
-| #                                        | Scenario               | Failure injected                                                                                                                                                                                                                                                                                                                                                                                              | Consensus             |
-| ---------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| #                                        | Scenario               | Failure injected                                                                                                                                                                                                                                                                                                                                                                              | Consensus             |
+| ---------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | [10](scenarios/10-genesis-config-drift/) | Genesis / config drift | Boot a joiner node from a drifted genesis (`chainId` changed): every peer rejects it at the eth handshake, so it sits at block 0 with no useful peers — the everyday "new member's node won't sync" incident — while the network is completely unaffected. A control arm first proves the same joiner with the correct genesis full-syncs to head, isolating the genesis as the only variable | Any (handshake layer) |
 
 ## Runbook
@@ -124,18 +128,18 @@ causes, diagnosis steps, recovery procedure, prevention. An entry is added only
 after the corresponding scenario has been run and its recovery procedure
 verified, so the runbook stays grounded in observed behaviour rather than theory.
 
-| Entry                                                                                          | Backed by scenario                             |
-| ---------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| [Validator down, network healthy](runbook/01-validator-down-network-healthy.md)                | [01](scenarios/01-validator-loss/) (Step 1)    |
-| [Chain halted, quorum loss](runbook/02-chain-halted-quorum-loss.md)                            | [01](scenarios/01-validator-loss/) (Steps 2–4) |
-| [Chain halted, network partition](runbook/03-chain-halted-network-partition.md)                | [02](scenarios/02-network-partition/)          |
-| [Erratic block times, slow validator](runbook/04-erratic-block-times-slow-validator.md)        | [03](scenarios/03-slow-peer/)                  |
-| [Changing the validator set](runbook/05-validator-set-governance.md)                           | [04](scenarios/04-validator-governance/)       |
-| [Transactions rejected or stuck pending](runbook/06-transactions-rejected-or-stuck-pending.md) | [06](scenarios/06-txpool-flooding/)            |
-| [Account not authorized to send](runbook/07-account-not-authorized-to-send.md)                 | [07](scenarios/07-account-permissioning/)      |
-| [Network "up" but no transactions](runbook/08-network-up-but-no-transactions.md)               | [08](scenarios/08-permissioning-outage/)       |
-| [Restoring a node from a volume snapshot](runbook/09-node-restore-from-volume-snapshot.md)     | [09](scenarios/09-snapshot-restore/)           |
-| [New/member node won't sync (genesis mismatch)](runbook/10-member-node-wont-sync-genesis-mismatch.md) | [10](scenarios/10-genesis-config-drift/) |
+| Entry                                                                                                 | Backed by scenario                             |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| [Validator down, network healthy](runbook/01-validator-down-network-healthy.md)                       | [01](scenarios/01-validator-loss/) (Step 1)    |
+| [Chain halted, quorum loss](runbook/02-chain-halted-quorum-loss.md)                                   | [01](scenarios/01-validator-loss/) (Steps 2–4) |
+| [Chain halted, network partition](runbook/03-chain-halted-network-partition.md)                       | [02](scenarios/02-network-partition/)          |
+| [Erratic block times, slow validator](runbook/04-erratic-block-times-slow-validator.md)               | [03](scenarios/03-slow-peer/)                  |
+| [Changing the validator set](runbook/05-validator-set-governance.md)                                  | [04](scenarios/04-validator-governance/)       |
+| [Transactions rejected or stuck pending](runbook/06-transactions-rejected-or-stuck-pending.md)        | [06](scenarios/06-txpool-flooding/)            |
+| [Account not authorized to send](runbook/07-account-not-authorized-to-send.md)                        | [07](scenarios/07-account-permissioning/)      |
+| [Network "up" but no transactions](runbook/08-network-up-but-no-transactions.md)                      | [08](scenarios/08-permissioning-outage/)       |
+| [Restoring a node from a volume snapshot](runbook/09-node-restore-from-volume-snapshot.md)            | [09](scenarios/09-snapshot-restore/)           |
+| [New/member node won't sync (genesis mismatch)](runbook/10-member-node-wont-sync-genesis-mismatch.md) | [10](scenarios/10-genesis-config-drift/)       |
 
 ## Safety
 
