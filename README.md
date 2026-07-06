@@ -2,57 +2,71 @@
 
 [![CI](https://github.com/jaravan/besu-chaos-engineering/actions/workflows/ci.yml/badge.svg)](https://github.com/jaravan/besu-chaos-engineering/actions/workflows/ci.yml)
 
-**Reproducible failure injection and verified recovery for permissioned
-[Hyperledger Besu](https://besu.hyperledger.org/) networks on Kubernetes** —
-every scenario is executed against a real network before its runbook entry is
-written. The operational companion to
-[besu-sandbox](https://github.com/jaravan/besu-helmcharts): deploy → break →
-diagnose → recover.
+Reproducible failure injection and verified recovery for permissioned
+[Hyperledger Besu](https://besu.hyperledger.org/) networks on Kubernetes. Every
+scenario is run against a real network before its runbook entry is written. It is
+the operational companion to
+[besu-sandbox](https://github.com/jaravan/besu-helmcharts).
 
 ## What this is
 
 Most operational knowledge about running Besu consortium networks lives in
-incident tickets and the heads of the people who ran them. This repo makes it
-public and reproducible: controlled failure injection against real
-permissioned networks, observed behaviour, and step-by-step recovery
-procedures.
+incident tickets and in the heads of the people who ran them. This repo makes it
+public and reproducible: controlled failure injection against real permissioned
+networks, the observed behaviour, and step-by-step recovery procedures.
 
-Besu supports several Byzantine-fault-tolerant consensus mechanisms for
-permissioned deployments — QBFT and IBFT 2.0. Some failure modes are
-consensus-agnostic (a node loss, a bad genesis, a flooded txpool); others depend
-on the protocol (how a BFT set behaves when quorum is lost). Scenarios note which
-consensus they target and, where it matters, how the behaviour differs across
-them.
+Besu supports two Byzantine-fault-tolerant consensus mechanisms for permissioned
+deployments, QBFT and IBFT 2.0. Some failure modes are consensus-agnostic (a node
+loss, a bad genesis, a flooded txpool). Others depend on the protocol, such as how
+a BFT set behaves when quorum is lost. Each scenario notes which consensus it
+targets and, where it matters, how the behaviour differs across the two.
 
-Each scenario follows the same loop — **inject → observe → recover → assert** —
-and backs a runbook entry once its recovery procedure has actually been run and
-verified.
-
-Every scenario runs against my own published Helm chart,
-[besu-sandbox](https://github.com/jaravan/besu-helmcharts) — installed straight
+Each scenario follows the same loop, inject → observe → recover → assert, and
+backs a runbook entry once its recovery procedure has actually been run and
+verified. Every scenario runs against my own published Helm chart,
+[besu-sandbox](https://github.com/jaravan/besu-helmcharts), installed straight
 from its OCI registry.
+
+```mermaid
+flowchart LR
+    I["**Inject**<br/>controlled failure<br/>on a real network"]
+    O["**Observe**<br/>what Besu<br/>actually does"]
+    R["**Recover**<br/>documented<br/>procedure"]
+    A["**Assert**<br/>verified back<br/>to health"]
+    RB(["Runbook entry"])
+
+    I --> O --> R --> A -->|backs| RB
+    A -.->|refine| I
+    RB ~~~ pad[ ]
+
+    classDef stage fill:#eef4ff,stroke:#4a72b0,stroke-width:1px,color:#1b2a4a;
+    classDef book fill:#e8f5e9,stroke:#4a8a52,stroke-width:1px,color:#1b3a20;
+    classDef pad fill:none,stroke:none;
+    class I,O,R,A stage;
+    class RB book;
+    class pad pad;
+```
 
 ## Requirements
 
-The scenarios run against a **Kubernetes cluster**. They're pure `kubectl` under
-the hood, so any cluster you can reach will do — [kind](https://kind.sigs.k8s.io/)
-is just the environment they were developed and run against, and what the
-`make cluster-up` / `cluster-down` helpers drive. Bring your own cluster and you
-can skip those targets.
+The scenarios run against a **Kubernetes cluster**. They are pure `kubectl` under
+the hood, so any cluster you can reach will do. [kind](https://kind.sigs.k8s.io/)
+is the environment they were developed against and what the `make cluster-up` /
+`cluster-down` helpers drive. Bring your own cluster and you can skip those targets.
 
-- A [Kubernetes](https://kubernetes.io/) cluster — [kind](https://kind.sigs.k8s.io/) is used here; [minikube](https://minikube.sigs.k8s.io/) / [k3d](https://k3d.io/) / [k3s](https://k3s.io/) / any cluster works
+- A [Kubernetes](https://kubernetes.io/) cluster. [kind](https://kind.sigs.k8s.io/) is used here; [minikube](https://minikube.sigs.k8s.io/) / [k3d](https://k3d.io/) / [k3s](https://k3s.io/) / any cluster works
 - [kubectl](https://kubernetes.io/docs/reference/kubectl/) (>= 1.30), pointed at that cluster
 - [Helm](https://helm.sh/) >= 3.8 (OCI support)
 - [Docker](https://www.docker.com/) (for kind, or any cluster that needs it)
 
-**Local clusters work out of the box.** Many scenarios need nothing beyond a
-working cluster and outbound image pulls; others need cluster _capabilities_ that
-a locked-down managed cluster may not grant — properties of the cluster's policy,
-not of any one vendor. For example:
+Local clusters work out of the box. Many scenarios need nothing beyond a working
+cluster and outbound image pulls. Others need cluster _capabilities_ that a
+locked-down managed cluster may not grant, which are properties of the cluster's
+policy rather than of any one vendor:
 
-- **Privileged ephemeral containers** — the network-partition and slow-peer
-  scenarios attach a `NET_ADMIN` debug container (`kubectl debug --profile=sysadmin`) to shape traffic in a node's network namespace (`iptables` DROP rules / `tc netem`); a cluster with restrictive PodSecurity admission will reject this.
-- **Public image egress** — scenarios pull `curlimages/curl`, and the traffic-shaping scenarios add `nicolaka/netshoot`; air-gapped clusters need these mirrored.
+- Privileged ephemeral containers. The network-partition and slow-peer
+  scenarios attach a `NET_ADMIN` debug container (`kubectl debug --profile=sysadmin`) to shape traffic inside a node's network namespace (`iptables` DROP rules, `tc netem`). A cluster with restrictive PodSecurity admission will reject this.
+- Public image egress. Scenarios pull `curlimages/curl`, and the traffic-shaping scenarios add `nicolaka/netshoot`. An air-gapped cluster needs these mirrored first.
 
 ## Quickstart
 
@@ -66,10 +80,14 @@ make cluster-down   # tear down the kind cluster (no-op if you brought your own)
 
 ## Sample run
 
-What a scenario actually prints — an unedited excerpt from a real
-`make scenario-01` run (kind, chart 0.3.3, Besu 26.6.1, QBFT, 2s blocks): one
-validator lost while the network stays healthy, then two — quorum broken, a
-verified halt, and a measured recovery.
+An unedited excerpt from a real `make scenario-01` run (kind, chart 0.3.3,
+Besu 26.6.1, QBFT, 2s blocks): one validator lost while the network stays healthy,
+then two, with a verified halt and a measured recovery.
+
+![scenario-01 run: quorum lost demo](img/sample-run.svg)
+
+<details>
+<summary>Plain-text log</summary>
 
 ```text
 [14:35:36] === baseline (consensus=qbft) ===
@@ -94,24 +112,25 @@ verified halt, and a measured recovery.
 [14:39:31] === scenario 01 complete ===
 ```
 
-The two lines that matter: the chain **halts** the moment quorum is lost —
-while every pod stays `Ready` and RPC keeps answering (the false comfort this
-repo keeps returning to) — and recovery is **measured**, not assumed
-(`RTO from scale-up: 78s`).
+</details>
+
+Two lines carry the finding. The chain halts the moment quorum is lost, while
+every pod stays `Ready` and RPC keeps answering. Recovery is measured, not
+assumed (`RTO from scale-up: 78s`).
 
 ## Scenarios
 
-Each scenario lives in its own directory under [scenarios/](scenarios/) and
-contains a `README.md` (hypothesis, method, expected and observed behaviour) and
-a `run.sh` that executes the full inject → observe → recover → assert cycle.
-Scenario numbers are stable IDs wired into the Makefile and the runbook.
+Each scenario lives in its own directory under [scenarios/](scenarios/) with a
+`README.md` (hypothesis, method, expected and observed behaviour) and a `run.sh`
+that executes the full inject → observe → recover → assert cycle. Scenario numbers
+are stable IDs wired into the Makefile and the runbook.
 
-> **Cross-cutting note — cold-start peering.** On chart ≤ 0.2.2 a fresh
+> **Cross-cutting note: cold-start peering.** On chart ≤ 0.2.2 a fresh
 > simultaneous deploy could leave the validators in a sparse hub-and-spoke mesh
 > (`net_peerCount` `3/1/1/1`) even though every pod is `Running`/`Ready` and blocks
-> are flowing — a Kubernetes/P2P startup-timing artifact, independent of QBFT vs
-> IBFT 2.0. **Fixed in chart 0.2.3** (`publishNotReadyAddresses` on the validator
-> Services): fresh installs now cold-start to a full `3/3/3/3` mesh.
+> are flowing. This was a Kubernetes/P2P startup-timing artifact, independent of
+> QBFT vs IBFT 2.0, and is fixed in chart 0.2.3 (`publishNotReadyAddresses` on the
+> validator Services): fresh installs now cold-start to a full `3/3/3/3` mesh.
 
 ### Consensus & availability
 
@@ -124,12 +143,12 @@ deliberately reconfigured.
 | [02](scenarios/02-network-partition/)    | Network partition       | iptables split `[1,2] \| [3,4]`: neither side has quorum, both halt at the same block, every pod still Ready       | QBFT · IBFT 2.0 |
 | [03](scenarios/03-slow-peer/)            | Slow peer               | `tc netem` degrades one validator past the round-change timeout — silent loss of all fault tolerance               | QBFT · IBFT 2.0 |
 | [04](scenarios/04-validator-governance/) | Validator governance    | Vote a member out of the validator set and back in at runtime — no restart, no genesis change                      | QBFT · IBFT 2.0 |
-| [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | A second node runs the same validator key (HA gone wrong): dedupe shuts the copy out only while the original is connected — isolate the original and the copy takes the proposer slot, signing under the shared key | QBFT · IBFT 2.0 |
+| [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | A second node runs the same validator key (HA gone wrong): the copy never joins consensus — with documented limits | QBFT · IBFT 2.0 |
 
 ### Transaction layer
 
 What gates, strands, or rejects a transaction while consensus stays healthy. These
-scenarios are engine-agnostic — they exercise the transaction pipeline, not the
+scenarios are engine-agnostic: they exercise the transaction pipeline, not the
 validator set.
 
 | #                                         | Scenario                  | Failure injected                                                                                                   | Consensus      |
@@ -140,9 +159,9 @@ validator set.
 
 ### State & storage
 
-Whether a node can be rebuilt from what's on disk — and which backups deserve
-the trust. These scenarios operate on one node's data volume; consensus stays
-healthy throughout (the target is beyond quorum).
+Whether a node can be rebuilt from what is on disk, and which backups deserve the
+trust. These scenarios operate on one node's data volume; consensus stays healthy
+throughout (the target is beyond quorum).
 
 | #                                    | Scenario         | Failure injected                                                                                                            | Consensus           |
 | ------------------------------------ | ---------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------- |
@@ -150,9 +169,9 @@ healthy throughout (the target is beyond quorum).
 
 ### Configuration & onboarding
 
-What keeps a correctly-running node from ever joining the network. In a
-consortium each member deploys their own node, so configuration drifts — and
-the gate sits below consensus, at the devp2p/eth handshake.
+What keeps a correctly-running node from ever joining the network. In a consortium
+each member deploys their own node, so configuration drifts, and the gate sits
+below consensus at the devp2p/eth handshake.
 
 | #                                        | Scenario               | Failure injected                                                                                        | Consensus             |
 | ---------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------- | --------------------- |
@@ -160,10 +179,10 @@ the gate sits below consensus, at the devp2p/eth handshake.
 
 ## Runbook
 
-[runbook/](runbook/) holds incident entries in a fixed format — symptom, likely
+[runbook/](runbook/) holds incident entries in a fixed format: symptom, likely
 causes, diagnosis steps, recovery procedure, prevention. An entry is added only
-after the corresponding scenario has been run and its recovery procedure
-verified, so the runbook stays grounded in observed behaviour rather than theory.
+after the corresponding scenario has been run and its recovery procedure verified,
+so the runbook stays grounded in observed behaviour rather than theory.
 
 | Entry                                                                                                 | Backed by scenario                             |
 | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
@@ -182,19 +201,16 @@ verified, so the runbook stays grounded in observed behaviour rather than theory
 
 These scenarios inject real failures and are intended only for disposable test
 networks. As a guardrail the scripts refuse to run unless the current kubectl
-context looks like a local/disposable cluster — `kind-*`, `minikube`, `k3d-*`,
+context looks like a local/disposable cluster: `kind-*`, `minikube`, `k3d-*`,
 `k3s`, or `docker-desktop`. Any other context (including a managed cluster)
 requires `ALLOW_ANY_CONTEXT=1` to run, at your own risk.
 
-> **`ALLOW_ANY_CONTEXT`** It is not a Kubernetes or Helm setting — it's an
-> environment-variable escape hatch defined by this repo's own guard
-> (`guard_local_context` in [`scripts/lib.sh`](scripts/lib.sh)). The guard reads
-> your current kubectl context and, if it isn't one of the recognised local
-> prefixes above, aborts the run. Setting `ALLOW_ANY_CONTEXT=1` tells the guard to
-> skip that check and proceed against whatever context is active. Use it only when
-> you have _deliberately_ pointed kubectl at a cluster you are certain is safe to
-> break — pass it per-invocation so it never lingers, e.g.
-> `ALLOW_ANY_CONTEXT=1 make scenario-01`.
+> `ALLOW_ANY_CONTEXT` is not a Kubernetes or Helm setting. It is an escape hatch
+> defined by this repo's own guard (`guard_local_context` in
+> [`scripts/lib.sh`](scripts/lib.sh)), which aborts the run if your current
+> context is not one of the recognised local prefixes above. Set it only when you
+> have deliberately pointed kubectl at a cluster you are certain is safe to break,
+> and pass it per-invocation so it never lingers: `ALLOW_ANY_CONTEXT=1 make scenario-01`.
 
 ## License
 

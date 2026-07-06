@@ -1,11 +1,8 @@
-# CI for a repo whose thesis is "verified, reproducible": lint the scripts,
-# verify the docs' internal cross-links, then actually do the thing — spin up
-# kind, install the published chart, and run real scenarios end-to-end.
-#
-# The e2e job deliberately runs the same entrypoints the README gives humans
-# (make install / make scenario-NN): CI is a user of the repo, not a special
-# path. The weekly cron keeps the badge honest against bit-rot — the chart and
-# images are pulled fresh from their registries on every run.
+# Lint the scripts, verify the docs' internal cross-links, then spin up kind,
+# install the published chart, and run real scenarios end-to-end. The e2e job
+# runs the same entrypoints the README documents (make install / make
+# scenario-NN). The weekly cron catches chart/image drift with no code change:
+# the chart and images are pulled fresh from their registries on every run.
 name: CI
 
 on:

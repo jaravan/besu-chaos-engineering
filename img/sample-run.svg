@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 812 520" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" role="img" aria-labelledby="title desc">
+  <title id="title">make scenario-01 sample run</title>
+  <desc id="desc">Terminal output from a real make scenario-01 run on kind (QBFT, 2s blocks): a validator is lost while the chain keeps advancing, then quorum is broken and the chain halts at block 42, then both validators are scaled back and recovery is measured at 78 seconds.</desc>
+  <style>
+    .ts   { fill: #539bf5; font-weight: 700; }
+    .pass { fill: #57ab5a; font-weight: 700; }
+    .txt  { fill: #adbac7; }
+    .dim  { fill: #636e7b; }
+    .cap  { fill: #768390; }
+    text  { font-size: 13.5px; white-space: pre; }
+  </style>
+
+  <rect x="1" y="1" width="810" height="518" rx="10" fill="#0d1117" stroke="#30363d"/>
+  <rect x="1" y="1" width="810" height="33" rx="10" fill="#161b22"/>
+  <rect x="1" y="20" width="810" height="14" fill="#161b22"/>
+  <circle cx="22" cy="17" r="6" fill="#ff5f56"/>
+  <circle cx="42" cy="17" r="6" fill="#ffbd2e"/>
+  <circle cx="62" cy="17" r="6" fill="#27c93f"/>
+  <text x="406" y="21" text-anchor="middle" class="cap">make scenario-01 — kind · QBFT · 2s blocks</text>
+
+  <g xml:space="preserve">
+    <text x="20" y="62"><tspan class="ts">[14:35:36]</tspan><tspan class="txt"> === baseline (consensus=qbft) ===</tspan></text>
+    <text x="20" y="83"><tspan class="pass">[PASS]</tspan><tspan class="txt"> chain advancing (17 -&gt; 18 in 2s)</tspan></text>
+    <text x="20" y="104"><tspan class="ts">[14:35:39]</tspan><tspan class="txt"> === STEP 1: single validator loss (target validator 2) ===</tspan></text>
+    <text x="20" y="125"><tspan class="ts">[14:35:39]</tspan><tspan class="txt"> --- 1a: ungraceful kill (force delete sbx-validator2-0) ---</tspan></text>
+    <text x="20" y="146"><tspan class="ts">[14:35:39]</tspan><tspan class="txt"> pod force-deleted at height 19; chain must keep advancing while it restarts</tspan></text>
+    <text x="20" y="167"><tspan class="pass">[PASS]</tspan><tspan class="txt"> chain advancing (19 -&gt; 20 in 2s)</tspan></text>
+    <text x="20" y="188"><tspan class="ts">[14:36:00]</tspan><tspan class="txt"> sbx-validator2-0 Ready again after 21s</tspan></text>
+    <text x="20" y="209"><tspan class="pass">[PASS]</tspan><tspan class="txt"> 1a: restarted validator rejoined (peers=3, height=27)</tspan></text>
+    <text x="20" y="230"><tspan class="dim">...</tspan></text>
+    <text x="20" y="251"><tspan class="ts">[14:37:10]</tspan><tspan class="txt"> === STEP 2: quorum loss (scale validators 2 3 to 0) ===</tspan></text>
+    <text x="20" y="272"><tspan class="ts">[14:37:11]</tspan><tspan class="txt"> both validators gone; expecting halt</tspan></text>
+    <text x="20" y="293"><tspan class="pass">[PASS]</tspan><tspan class="txt"> chain halted at block 42 for 45s</tspan></text>
+    <text x="20" y="314"><tspan class="ts">[14:38:06]</tspan><tspan class="txt"> RPC reads still served during halt: height=42, validator set query answered</tspan></text>
+    <text x="20" y="335"><tspan class="ts">[14:38:06]</tspan><tspan class="txt"> surviving validator1 peer count during outage: 1</tspan></text>
+    <text x="20" y="356"><tspan class="ts">[14:38:06]</tspan><tspan class="txt"> --- recover: scale both back, measure RTO ---</tspan></text>
+    <text x="20" y="377"><tspan class="ts">[14:38:26]</tspan><tspan class="txt"> both pods Ready after 20s; waiting for first block above 42</tspan></text>
+    <text x="20" y="398"><tspan class="pass">[PASS]</tspan><tspan class="txt"> halt duration 76s -&gt; first new block 58s after pods Ready (RTO from scale-up: 78s)</tspan></text>
+    <text x="20" y="419"><tspan class="ts">[14:39:28]</tspan><tspan class="txt"> --- post-recovery: steady state ---</tspan></text>
+    <text x="20" y="440"><tspan class="pass">[PASS]</tspan><tspan class="txt"> chain advancing (43 -&gt; 44 in 2s)</tspan></text>
+    <text x="20" y="461"><tspan class="ts">[14:39:31]</tspan><tspan class="txt"> === scenario 01 complete ===</tspan></text>
+  </g>
+</svg>

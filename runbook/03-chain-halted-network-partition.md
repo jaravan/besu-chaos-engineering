@@ -4,35 +4,33 @@
 
 ## Symptom
 
-Identical to [quorum loss](02-chain-halted-quorum-loss.md) on the surface, but
-one degree more deceptive:
+Identical to [quorum loss](02-chain-halted-quorum-loss.md) on the surface, but one
+degree more deceptive:
 
-- **Block height frozen**, RPC still answering reads on every node.
-- **Every validator pod is `Running`/`Ready`.** Nothing is down, nothing is
-  CrashLooping — there isn't even a missing pod to notice. Kubernetes reports a
-  perfectly healthy deployment while the network is completely halted.
-- **Peer counts have collapsed** — each validator sees only the nodes on its own
-  side of the partition (in the verified 2/2 split, ~1 peer each; fewer if the
-  peer mesh had not fully formed before the partition, e.g. a side dropping to 0).
+- Block height frozen, RPC still answering reads on every node.
+- Every validator pod is `Running`/`Ready`. Nothing is down, nothing is CrashLooping,
+  and there isn't even a missing pod to notice. Kubernetes reports a perfectly healthy
+  deployment while the network is completely halted.
+- Peer counts have collapsed: each validator sees only the nodes on its own side of the
+  partition (in the verified 2/2 split, ~1 peer each; fewer if the peer mesh had not
+  fully formed before the partition, e.g. a side dropping to 0).
 
-This is the strongest possible case for **alerting on block-height-stall, not on
-pod health**: every pod-level and container-level signal is green.
+This is the strongest case for alerting on block-height-stall rather than pod health:
+every pod-level and container-level signal is green.
 
 ## Likely Causes
 
 Ordered by frequency in practice:
 
-1. **Network partition between validators** — a NetworkPolicy change, CNI fault,
-   security-group/firewall edit, or WAN link failure between the
-   organisations/zones hosting the validators. Splits the set so no side has the
-   2f+1 = 3 quorum.
-2. **DNS / service-discovery breakage** that stops validators resolving each
-   other's enodes after a restart — looks like a partition (peers can't
-   connect) even though the network path is fine.
-3. **Asymmetric partition** isolating a minority (e.g. one validator cut off):
-   this does **not** halt the chain — the majority keeps quorum and keeps
-   producing. If height is still advancing, you have a minority partition, not
-   this incident.
+1. **Network partition between validators** (a NetworkPolicy change, CNI fault,
+   security-group/firewall edit, or WAN link failure between the organisations/zones
+   hosting the validators). Splits the set so no side has the 2f+1 = 3 quorum.
+2. **DNS / service-discovery breakage** that stops validators resolving each other's
+   enodes after a restart. Looks like a partition (peers can't connect) even though the
+   network path is fine.
+3. **Asymmetric partition** isolating a minority (e.g. one validator cut off). This does
+   not halt the chain: the majority keeps quorum and keeps producing. If height is still
+   advancing, you have a minority partition, not this incident.
 
 ## Diagnosis Steps
 
@@ -71,51 +69,47 @@ kubectl -n besu exec sbx-validator1-0 -- /bin/sh -c 'true'  # then test connecti
 
 ## Recovery Procedure
 
-1. **Heal the partition** — revert the NetworkPolicy/firewall change, restore
-   the CNI/link, or fix DNS. **You do not need to restart the validators.** In the
-   verified runs (short 2/2 partition, round only climbed to 2), flushing the
-   blocking rules with no pod restart brought the network back **10s (QBFT) / 82s
-   (IBFT 2.0)** later — automatic, no manual intervention. The spread is normal:
-   recovery waits out wherever the surviving validators are in their current
-   round-change timer, and IBFT 2.0's round-change/proposer startup is slower.
-2. **Do not "fix" it by restarting validators.** They are not hung — they are in
-   BFT round-change backoff. Restarting them adds resync time on top of the
-   round-change wait and lengthens the outage (see
-   [quorum loss](02-chain-halted-quorum-loss.md) for the measured backoff
-   curve).
-3. **Recovery is automatic once connectivity returns.** Because the validators
-   stayed in sync at the same height (BFT never forked), there is nothing to
-   reconcile — they resume from the last committed block. Expect the same
-   round-change backoff as a quorum-loss outage of equal duration: short
-   partitions recover in seconds, long ones take proportionally (super-linearly)
-   longer.
-4. **Verify:** a new block appears above the halt height, all four validators
-   advance together, and the peer mesh re-forms (allow minutes for full mesh —
-   the peer-count lag is expected and self-heals).
+1. **Heal the partition.** Revert the NetworkPolicy/firewall change, restore the
+   CNI/link, or fix DNS. You do not need to restart the validators. In the verified runs
+   (short 2/2 partition, round only climbed to 2), flushing the blocking rules with no
+   pod restart brought the network back 10s (QBFT) / 82s (IBFT 2.0) later, automatic and
+   with no manual intervention. The spread is normal: recovery waits out wherever the
+   surviving validators are in their current round-change timer, and IBFT 2.0's
+   round-change/proposer startup is slower.
+2. **Do not "fix" it by restarting validators.** They are not hung; they are in BFT
+   round-change backoff. Restarting them adds resync time on top of the round-change
+   wait and lengthens the outage (see [quorum loss](02-chain-halted-quorum-loss.md) for
+   the measured backoff curve).
+3. **Recovery is automatic once connectivity returns.** Because the validators stayed in
+   sync at the same height (BFT never forked), there is nothing to reconcile; they resume
+   from the last committed block. Expect the same round-change backoff as a quorum-loss
+   outage of equal duration: short partitions recover in seconds, long ones take
+   proportionally (super-linearly) longer.
+4. **Verify:** a new block appears above the halt height, all four validators advance
+   together, and the peer mesh re-forms (allow minutes for full mesh; the peer-count lag
+   is expected and self-heals).
 
 ## Prevention
 
-- **Alert on block-height-stall, full stop.** A partition leaves every pod
-  `Ready` and every RPC endpoint live; height-not-advancing is the _only_
-  reliable detector.
-- **Add a cross-validator connectivity / peer-count probe** to monitoring: a
-  symmetric collapse in peer counts across the validator set is the signature of
-  a partition and distinguishes it from "validators down".
-- **Review NetworkPolicy and firewall changes as production-affecting.** A
-  policy that accidentally blocks the p2p port (30303) between validators is a
-  full network outage with zero pod-level symptoms — the highest-risk,
-  lowest-visibility change class for a consortium.
-- **Spread validators across failure domains deliberately, and know your quorum
-  math per domain.** If a single WAN link or zone boundary can isolate ≥ f+1
-  validators, that link is a single point of total outage.
+- Alert on block-height-stall, full stop. A partition leaves every pod `Ready` and
+  every RPC endpoint live; height-not-advancing is the only reliable detector.
+- Add a cross-validator connectivity / peer-count probe to monitoring: a symmetric
+  collapse in peer counts across the validator set is the signature of a partition and
+  distinguishes it from "validators down".
+- Review NetworkPolicy and firewall changes as production-affecting. A policy that
+  accidentally blocks the p2p port (30303) between validators is a full network outage
+  with zero pod-level symptoms, the highest-risk, lowest-visibility change class for a
+  consortium.
+- Spread validators across failure domains deliberately, and know your quorum math per
+  domain. If a single WAN link or zone boundary can isolate ≥ f+1 validators, that
+  link is a single point of total outage.
 
 ## Post-Incident
 
-- Preserve the round-change logs from both sides — they prove the network was
-  backing off (not hung) and that no side ever reached quorum, which justifies
-  the "heal the network, don't restart nodes" decision.
-- Confirm and record that heights never diverged (no fork). If they ever did,
-  that is a far more serious finding than the outage itself and warrants a
-  separate investigation.
-- Record the partition duration and recovery time; feed it into the same RTO
-  curve as quorum loss.
+- Preserve the round-change logs from both sides. They prove the network was backing off
+  (not hung) and that no side ever reached quorum, which justifies the "heal the network,
+  don't restart nodes" decision.
+- Confirm and record that heights never diverged (no fork). If they ever did, that is a
+  far more serious finding than the outage itself and warrants a separate investigation.
+- Record the partition duration and recovery time; feed it into the same RTO curve as
+  quorum loss.

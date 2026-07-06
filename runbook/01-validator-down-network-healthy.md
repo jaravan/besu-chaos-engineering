@@ -7,46 +7,46 @@
 - Alerts firing on RPC connection errors, peer-disconnect events, or a dropped
   peer count on one or more nodes.
 - One validator pod is not `Ready`, is restarting, or has briefly vanished.
-- **Block height keeps advancing the whole time.** `eth_blockNumber` against
-  the unified RPC service still climbs every block period.
+- Block height keeps advancing the whole time. `eth_blockNumber` against the
+  unified RPC service still climbs every block period.
 
 This is the harmless version of [chain halted, quorum
-loss](02-chain-halted-quorum-loss.md): here the alerts look alarming but the
-network never lost quorum. With N=4 validators, quorum is 2f+1 = 3, so a single
-validator down leaves consensus fully functional.
+loss](02-chain-halted-quorum-loss.md): the alerts look alarming but the network
+never lost quorum. With N=4 validators, quorum is 2f+1 = 3, so a single validator
+down leaves consensus fully functional.
 
 ## Likely Causes
 
 Ordered by frequency in practice:
 
-1. **A single validator crashed and is being recreated** — OOM kill, node
-   drain/eviction, SIGKILL, image re-pull. For a validator **you** operate, the
-   StatefulSet recreates it automatically. First establish **whose validator it
-   is**: in a consortium the down node may belong to another member, on their own
-   infrastructure — you have no StatefulSet, no logs, and no recovery lever for
-   it, only the quorum math (still N-1, healthy) and a notification to that
-   member. The auto-recovery and diagnosis steps below apply to nodes you run.
+1. **A single validator crashed and is being recreated** (OOM kill, node
+   drain/eviction, SIGKILL, image re-pull). For a validator you operate, the
+   StatefulSet recreates it automatically. First establish whose validator it is:
+   in a consortium the down node may belong to another member, on their own
+   infrastructure, where you have no StatefulSet, no logs, and no recovery lever,
+   only the quorum math (still N-1, healthy) and a notification to that member.
+   The auto-recovery and diagnosis steps below apply to nodes you run.
 2. **Cross-member / cross-cloud connectivity loss (consortium topology).** In a
    real consortium each validator is run by a different organization, often in a
-   different cloud, VPC, or region — so the validators reach each other over
-   inter-org links, not a single flat cluster network. A member can drop off the
-   set while its pod stays perfectly `Running`/`Ready`: a VPN or VPC-peering
-   flap, an egress firewall / security-group change on either side, a NAT /
-   public-IP or DNS change, a cert or enode-allowlist rotation, or cross-region
-   link degradation. From consensus it looks like one validator gone (still
-   N-1, quorum holds); from Kubernetes nothing is wrong at all. **If a link
+   different cloud, VPC, or region, so the validators reach each other over
+   inter-org links rather than a single flat cluster network. A member can drop
+   off the set while its pod stays perfectly `Running`/`Ready`: a VPN or
+   VPC-peering flap, an egress firewall / security-group change on either side, a
+   NAT / public-IP or DNS change, a cert or enode-allowlist rotation, or
+   cross-region link degradation. From consensus it looks like one validator gone
+   (still N-1, quorum holds); from Kubernetes nothing is wrong at all. If a link
    outage isolates two or more members at once it escalates to a partition /
-   [quorum loss](02-chain-halted-quorum-loss.md).**
-3. **Sustained single-validator outage** — PVC unavailable, scheduling failure,
-   stuck image pull. Pod stays down until the underlying cause is fixed, but the
+   [quorum loss](02-chain-halted-quorum-loss.md).
+3. **Sustained single-validator outage** (PVC unavailable, scheduling failure,
+   stuck image pull). Pod stays down until the underlying cause is fixed, but the
    chain still runs at N-1.
-4. **Pure false positive** — an RPC client had a connection pinned to the
+4. **Pure false positive.** An RPC client had a connection pinned to the
    restarted validator and logged connection errors; nothing in consensus was
    ever affected.
-5. **Transient peer-count dip after a restart** — a rejoining validator (or
-   even a healthy one shortly after deploy) reports fewer peers than full mesh
-   for minutes; alerting keyed on an absolute peer-count threshold fires even
-   though consensus is fine.
+5. **Transient peer-count dip after a restart.** A rejoining validator (or even a
+   healthy one shortly after deploy) reports fewer peers than full mesh for
+   minutes; alerting keyed on an absolute peer-count threshold fires even though
+   consensus is fine.
 
 ## Diagnosis Steps
 
@@ -73,15 +73,14 @@ kubectl -n besu exec chaos-probe -- curl -s -X POST \
 ```
 
 If `eth_blockNumber` is increasing and 3 of 4 validators are up, the network is
-healthy — the page is a false positive. The real question is only _why the one
-validator went down_, which you diagnose without time pressure.
+healthy and the page is a false positive. The only real question is why the one
+validator went down, which you diagnose without time pressure.
 
-**Crash vs. connectivity.** The distinction tells you where to look. If the pod
-is **not** `Running`/`Ready` (restarts, `Init:Error`, gone), it's a crash/outage
-(causes 1, 3) — check its events and previous logs. If the pod is **`Running`
-and healthy but its peer count is low**, it's reachable to Kubernetes but not to
-the other members — a connectivity problem (cause 2), common in cross-cloud
-consortiums:
+**Crash vs. connectivity** tells you where to look. If the pod is not
+`Running`/`Ready` (restarts, `Init:Error`, gone), it is a crash/outage (causes 1,
+3); check its events and previous logs. If the pod is `Running` and healthy but
+its peer count is low, it is reachable to Kubernetes but not to the other members,
+a connectivity problem (cause 2) common in cross-cloud consortiums:
 
 ```sh
 # Pod healthy locally but isolated? Query the suspect validator's OWN peer count
@@ -101,8 +100,8 @@ kubectl -n besu exec chaos-probe -- curl -s -X POST \
 ```
 
 For the connectivity case the fix is at the network layer (VPN/peering,
-firewall/security-group, DNS/NAT, enode allowlist), not on the node — and the
-urgency is whether the outage might widen to a second member (→ quorum loss).
+firewall/security-group, DNS/NAT, enode allowlist), not on the node. The urgency
+is whether the outage might widen to a second member (→ quorum loss).
 
 ## Recovery Procedure
 
@@ -122,30 +121,30 @@ urgency is whether the outage might widen to a second member (→ quorum loss).
    - its height within a few blocks of head.
    - in the verified run the rejoined validator was already at head (zero
      catch-up gap) by `Ready` + 10s.
-5. **Tolerate the peer-count lag.** Full-mesh peering can take _minutes_ to
-   re-establish after a restart — a node reporting 2 peers immediately after
-   `Ready` while others report 3 is expected and self-heals. It must not be
-   acted on.
+5. **Tolerate the peer-count lag.** Full-mesh peering can take minutes to
+   re-establish after a restart. A node reporting 2 peers immediately after
+   `Ready` while others report 3 is expected, self-heals, and must not be acted
+   on.
 
 ## Prevention
 
-- **Alert on block-height-stall, not on RPC errors or peer-count dips.** Height
+- Alert on block-height-stall, not on RPC errors or peer-count dips. Height
   not advancing for > N block periods is the signal that the _network_ is in
   trouble. RPC connection errors and single-node peer drops are not.
-- **Add hysteresis/grace to peer-count alerts** (e.g. only alert if below
+- Add hysteresis/grace to peer-count alerts (e.g. only alert if below
   threshold for several minutes). Full mesh lags pod readiness by minutes after
   any deploy or restart.
-- **PodDisruptionBudget `maxUnavailable: 1`** on the validators so node drains
+- PodDisruptionBudget `maxUnavailable: 1` on the validators so node drains
   and rolling updates can never take two validators down at once — which would
   turn this benign scenario into [quorum
   loss](02-chain-halted-quorum-loss.md).
-- **Monitor inter-member connectivity, not just local pod health** (consortium
+- Monitor inter-member connectivity, not just local pod health (consortium
   topology). A `Running` pod tells you nothing about whether it can still reach
-  the other organizations' validators. Alert on a validator's **own peer count
-  staying below the expected mesh for several minutes** (sustained, to ride out
-  the post-restart lag above) — that is your detector for a cross-cloud link,
-  firewall, or allowlist problem before it widens to a second member. Pair it
-  with reachability checks on the inter-org links themselves (VPN/peering health,
+  the other organizations' validators. Alert on a validator's own peer count
+  staying below the expected mesh for several minutes (sustained, to ride out the
+  post-restart lag above); that is your detector for a cross-cloud link, firewall,
+  or allowlist problem before it widens to a second member. Pair it with
+  reachability checks on the inter-org links themselves (VPN/peering health,
   enode/port reachability) owned outside the chain.
 
 ## Post-Incident
