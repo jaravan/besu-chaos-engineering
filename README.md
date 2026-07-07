@@ -145,6 +145,8 @@ deliberately reconfigured.
 | [04](scenarios/04-validator-governance/) | Validator governance    | Vote a member out of the validator set and back in at runtime — no restart, no genesis change                      | QBFT · IBFT 2.0 |
 | [05](scenarios/05-duplicate-validator/)  | Duplicate validator key | A second node runs the same validator key (HA gone wrong): the copy never joins consensus — with documented limits | QBFT · IBFT 2.0 |
 
+The **QBFT · IBFT 2.0** tag means that the test was ran and verified on both engines.
+
 ### Transaction layer
 
 What gates, strands, or rejects a transaction while consensus stays healthy. These

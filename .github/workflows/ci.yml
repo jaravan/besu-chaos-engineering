@@ -1,8 +1,9 @@
 # Lint the scripts, verify the docs' internal cross-links, then spin up kind,
 # install the published chart, and run real scenarios end-to-end. The e2e job
 # runs the same entrypoints the README documents (make install / make
-# scenario-NN). The weekly cron catches chart/image drift with no code change:
-# the chart and images are pulled fresh from their registries on every run.
+# scenario-NN), on both consensus engines.
+# The weekly cron catches chart/image drift with no code change: the chart and
+# images are pulled fresh from their registries on every run.
 name: CI
 
 on:
@@ -42,9 +43,14 @@ jobs:
           fail: true
 
   e2e:
-    name: "kind e2e: install + scenarios 01 & 10"
+    name: "kind e2e (${{ matrix.consensus }}): install + scenario 01"
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      # one engine failing must not cancel the other — we want both signals
+      fail-fast: false
+      matrix:
+        consensus: [qbft, ibft2]
     steps:
       - uses: actions/checkout@v4
 
@@ -55,18 +61,21 @@ jobs:
           # guard_local_context, exactly as a local run would be
           cluster_name: besu-chaos
 
-      - name: install besu-sandbox (chart + version pinned by the Makefile)
+      - name: "install besu-sandbox (CONSENSUS=${{ matrix.consensus }}, chart + version pinned by the Makefile)"
         run: |
           mkdir -p ci-logs
-          make install 2>&1 | tee ci-logs/install.log
+          make install CONSENSUS=${{ matrix.consensus }} 2>&1 | tee ci-logs/install.log
 
       - name: helm test
         run: make test 2>&1 | tee ci-logs/helm-test.log
 
-      - name: "scenario 01 - validator loss (single loss, then quorum loss + measured RTO)"
-        run: make scenario-01 2>&1 | tee ci-logs/scenario-01.log
+      - name: "scenario 01 - validator loss (CONSENSUS=${{ matrix.consensus }}: single loss, then quorum loss + measured RTO)"
+        run: make scenario-01 CONSENSUS=${{ matrix.consensus }} 2>&1 | tee ci-logs/scenario-01.log
 
+      # scenario 10 is engine-independent (devp2p/eth handshake layer, below
+      # consensus) — run it once, on the qbft leg, rather than redundantly on both
       - name: "scenario 10 - genesis config drift (control joiner, then drifted joiner)"
+        if: matrix.consensus == 'qbft'
         run: make scenario-10 2>&1 | tee ci-logs/scenario-10.log
 
       - name: scenario results -> job summary
@@ -98,6 +107,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-logs
+          name: e2e-logs-${{ matrix.consensus }}
           path: ci-logs/
           retention-days: 14
