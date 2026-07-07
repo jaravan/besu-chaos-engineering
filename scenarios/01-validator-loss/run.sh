@@ -70,11 +70,11 @@ step_single_validator_loss() {
   wait_pod_ready "${target_pod}" 300s
   kill_t1=$(date +%s)
   log "${target_pod} Ready again after $(( kill_t1 - kill_t0 ))s"
-  sleep 5  # let the fresh pod's RPC/peering settle before sampling it
-  rejoin_peers="$(peer_count "${target_svc}")"
+  # Ready precedes P2P re-discovery, so poll instead of sampling once — a slow
+  # re-dial is latency, not a lost peer.
+  rejoin_peers="$(wait_for_peers "${target_svc}" 3 60)" \
+    || fail "restarted validator only reached ${rejoin_peers} peers in 60s (expected >= 3)"
   rejoin_height="$(block_height "${target_svc}")"
-  [[ -n "${rejoin_peers}" ]] && (( rejoin_peers >= 3 )) \
-    || fail "restarted validator has ${rejoin_peers:-no} peers (expected >= 3)"
   pass "1a: restarted validator rejoined (peers=${rejoin_peers}, height=${rejoin_height})"
 
   log "--- 1b: sustained outage (scale ${target_sts} to 0 for ${OUTAGE_WINDOW}s) ---"

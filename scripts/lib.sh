@@ -232,3 +232,20 @@ wait_for_height_above() {
   done
   fail "no block above ${target} within ${timeout}s"
 }
+
+# wait_for_peers <host> <min> [timeout] — poll net_peerCount until it reaches
+# min, then echo it. A node reports Ready before P2P has re-dialled its peers,
+# so sampling once right after Ready is racy.
+wait_for_peers() {
+  local host="$1" min="$2" timeout="${3:-60}" peers elapsed=0
+  while (( elapsed < timeout )); do
+    peers="$(peer_count "${host}")"
+    if [[ -n "${peers}" ]] && (( peers >= min )); then
+      echo "${peers}"
+      return 0
+    fi
+    sleep 2; (( elapsed += 2 ))
+  done
+  echo "${peers:-0}"
+  return 1
+}
