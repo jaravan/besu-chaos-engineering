@@ -72,10 +72,9 @@ kubectl -n besu exec sbx-validator1-0 -- /bin/sh -c 'true'  # then test connecti
 1. **Heal the partition.** Revert the NetworkPolicy/firewall change, restore the
    CNI/link, or fix DNS. You do not need to restart the validators. In the verified runs
    (short 2/2 partition, round only climbed to 2), flushing the blocking rules with no
-   pod restart brought the network back 10s (QBFT) / 82s (IBFT 2.0) later, automatic and
-   with no manual intervention. The spread is normal: recovery waits out wherever the
-   surviving validators are in their current round-change timer, and IBFT 2.0's
-   round-change/proposer startup is slower.
+   pod restart brought the network back 10s (QBFT) / 6s (IBFT 2.0) later, automatic and
+   with no manual intervention. The small spread is normal: recovery waits out wherever
+   the surviving validators are in their current round-change timer.
 2. **Do not "fix" it by restarting validators.** They are not hung; they are in BFT
    round-change backoff. Restarting them adds resync time on top of the round-change
    wait and lengthens the outage (see [quorum loss](02-chain-halted-quorum-loss.md) for

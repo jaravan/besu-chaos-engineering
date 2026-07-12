@@ -101,9 +101,9 @@ in step 4 is the lever when the automatic wait is unacceptable.
 
    | Halt duration | First new block _after_ both pods `Ready` |
    | ------------- | ----------------------------------------- |
-   | 71s           | 60s                                       |
-   | 154s          | 134s                                      |
-   | 341s          | **588s** (~10 min)                        |
+   | 76s           | 58s                                       |
+   | 178s          | 286s                                      |
+   | 340s          | **590s** (~10 min)                        |
 
    A ~5.5-minute outage cost nearly 10 minutes of additional downtime after
    Kubernetes already reported every pod `Ready`. Block production resuming minutes
@@ -128,9 +128,9 @@ in step 4 is the lever when the automatic wait is unacceptable.
    kubectl -n besu delete pod sbx-validator4-0                    # survivor (not v1)
    ```
 
-   Verified on both engines after a 300s halt (where waiting it out costs ~588s):
-   the first block came 6s (QBFT) / 22s (IBFT 2.0) after pods were `Ready`, at round
-   1 / round 2 instead of the pre-restart ~round 5. Total recovery was 77s / 84s from
+   Verified on both engines after a 300s halt (where waiting it out costs ~590s):
+   the first block came 0s (QBFT) / 8s (IBFT 2.0) after pods were `Ready`, at a low
+   round (≈1–2) instead of the pre-restart ~round 5. Total recovery was 71s / 70s from
    the restart, almost all of it pod startup. Only do this when the residual round
    timer clearly dominates (a deep/long halt).
 
@@ -139,7 +139,7 @@ in step 4 is the lever when the automatic wait is unacceptable.
    the downed pair plus one survivor is already quorum; up to f survivors may be left
    untouched, because a single stuck survivor cannot drag the set back up (that needs
    f+1 high-round nodes). Verified on both engines (`STUCK_SURVIVORS=1`): leaving
-   validator1 stuck recovered in 2s after `Ready` (RTO 23s), faster than the full-set
+   validator1 stuck recovered 0s after `Ready` (RTO 22s), faster than the full-set
    restart, because skipping validator1 means the other pods do not wait on its
    liveness init-container. In practice: restart the downed pair plus the non-bootnode
    survivors, and leave validator1 (the liveness gate) running.

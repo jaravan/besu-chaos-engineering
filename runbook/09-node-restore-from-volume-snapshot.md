@@ -73,7 +73,7 @@ nothing further to do.
 
 1. **If the restored node starts (with or without WAL recovery): done.** Verify it
    rejoins and catches up (`net_peerCount` ≥ 3 and height within a few blocks of head).
-   In the verified runs the node was `Ready` 21–31s after scale-up and at gap 0 within
+   In the verified runs the node was `Ready` 21–22s after scale-up and at gap 0 within
    another 10s.
 2. **If RocksDB won't open, stop restarting the same corrupt volume.** In order of
    preference:

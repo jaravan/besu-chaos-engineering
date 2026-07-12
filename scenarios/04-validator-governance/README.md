@@ -175,10 +175,9 @@ services (`sbx-validator1..3`), since each vote is the casting node's own.
 
 For 4a, after re-add the script counts how many blocks `X` proposes in the window
 since it rejoined (`<engine>_getSignerMetrics` over a block range) and asserts it is
-
-> 0, a positive check that it resumed proposing. (The default `getSignerMetrics`
-> `proposedBlockCount` is a noisy sliding-window value that drifts ±1, so it is not used
-> as the signal.)
+`> 0` — a positive check that it resumed proposing. (The default `getSignerMetrics`
+`proposedBlockCount` is a noisy sliding-window value that drifts ±1, so it is not used
+as the signal.)
 
 **4b — restart vs. an already-cast vote** (`RESTART_VALIDATOR`, default 1; `PHANTOM`
 is the fake 5th address; `OTHER2` are two other voters). All three sub-experiments
