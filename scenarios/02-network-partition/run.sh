@@ -93,10 +93,20 @@ log "side-A head (validator${GROUP_A[0]})=${ha:-none}  side-B head (validator${G
 [[ -n "${ha}" && -n "${hb}" ]] || fail "a partition side stopped answering RPC (expected halted, not down)"
 (( ha == hb )) || fail "SPLIT-BRAIN: sides diverged (A=${ha}, B=${hb}) — unexpected for QBFT/IBFT 2.0"
 pass "no fork: both sides at height ${ha} with RPC alive"
-for n in 1 2 3 4; do
-  phase="$(kubectl -n "${NAMESPACE}" get pod "${POD[$n]}" -o jsonpath='{.status.phase}' 2>/dev/null)"
-  log "validator${n}: phase=${phase} peers=$(peer_count "$(validator_svc "$n")")"
+# Prove the halt is the partition, not an unrelated stall: once the DROP rules
+# take hold each node should keep only its own side's peers (|group|-1).
+max_a=$(( ${#GROUP_A[@]} - 1 )); max_b=$(( ${#GROUP_B[@]} - 1 ))
+for n in "${GROUP_A[@]}"; do
+  p="$(wait_for_peers_below "$(validator_svc "$n")" "${max_a}" 30)" \
+    || fail "validator${n} still sees ${p} peers (> ${max_a}) — side-A DROP rules did not isolate it"
+  log "validator${n} (side A): peers=${p} (<= ${max_a}) phase=$(kubectl -n "${NAMESPACE}" get pod "${POD[$n]}" -o jsonpath='{.status.phase}' 2>/dev/null)"
 done
+for n in "${GROUP_B[@]}"; do
+  p="$(wait_for_peers_below "$(validator_svc "$n")" "${max_b}" 30)" \
+    || fail "validator${n} still sees ${p} peers (> ${max_b}) — not isolated from side A"
+  log "validator${n} (side B): peers=${p} (<= ${max_b}) phase=$(kubectl -n "${NAMESPACE}" get pod "${POD[$n]}" -o jsonpath='{.status.phase}' 2>/dev/null)"
+done
+pass "partition confirmed at the peer layer: no node retains a cross-partition peer"
 log "round-change activity (side A, validator${GROUP_A[0]}):"
 kubectl -n "${NAMESPACE}" logs "${POD[${GROUP_A[0]}]}" --tail=200 2>/dev/null | grep -iE 'round|quorum|propos' | tail -5 || true
 

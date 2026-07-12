@@ -249,3 +249,21 @@ wait_for_peers() {
   echo "${peers:-0}"
   return 1
 }
+
+# wait_for_peers_below <host> <max> [timeout] — poll net_peerCount until it drops
+# to max or fewer, then echo it. Mirror of wait_for_peers: RLPx connections take
+# a few seconds to time out once their packets start being dropped, so sampling
+# once right after adding the rules is racy.
+wait_for_peers_below() {
+  local host="$1" max="$2" timeout="${3:-60}" peers elapsed=0
+  while (( elapsed < timeout )); do
+    peers="$(peer_count "${host}")"
+    if [[ -n "${peers}" ]] && (( peers <= max )); then
+      echo "${peers}"
+      return 0
+    fi
+    sleep 2; (( elapsed += 2 ))
+  done
+  echo "${peers:-?}"
+  return 1
+}
