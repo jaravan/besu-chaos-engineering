@@ -25,8 +25,9 @@ namespace differs (`qbft_*` vs `ibft_*`), which the script resolves from `CONSEN
 via `consensus_rpc_ns` in [`scripts/lib.sh`](../../scripts/lib.sh). The full 4a–4d run
 was executed on both engines and behaved near-identically (see [Observed](#observed)).
 This exercises the _vote/header-based_ validator management both engines share,
-distinct from QBFT's optional _smart-contract-based_ management, which this scenario
-does not cover. Select the engine with `CONSENSUS` (it must match the deployed
+distinct from QBFT's optional [_smart-contract-based_ management](https://docs.besu-eth.org/private-networks/how-to/configure/consensus/qbft) —
+where the validator set is [changed without voting](https://docs.besu-eth.org/private-networks/how-to/configure/consensus/add-validators-without-voting) —
+which this scenario does not cover. Select the engine with `CONSENSUS` (it must match the deployed
 release):
 
 ```sh
@@ -51,7 +52,10 @@ graph LR
 
 A vote can live in two places: a node's memory (the operator's pending intent via
 `proposeValidatorVote`, _ephemeral_) and the block headers (votes stamped on-chain,
-_permanent_). Each step probes a different one. _Diagram colours:_ yellow = a
+_permanent_). Each step probes a different one. (An _epoch_ is just a fixed span of
+`epochlength` blocks; at each epoch boundary Besu clears the running vote tally, so a
+vote that hasn't yet reached majority can be flushed there — the reset that several of
+the steps below hinge on.) _Diagram colours:_ yellow = a
 vote/intent, green = on-chain/permanent, grey = empty/blind, red = wiped or
 set-changed, blue = epoch.
 

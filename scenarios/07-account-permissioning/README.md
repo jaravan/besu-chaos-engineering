@@ -30,7 +30,8 @@ graph LR
 
 ## Hypothesis
 
-With Besu account permissioning enabled, only allowlisted accounts may submit
+With Besu's **local account** permissioning enabled (file-based allowlist, per node —
+not node permissioning, not onchain), only allowlisted accounts may submit
 transactions; a non-allowlisted sender is rejected at submission with an authorization
 error, distinct from the balance gate, which accepts and then strands. To isolate the
 authorization gate from the balance gate, the test account is genesis-funded and simply
@@ -91,7 +92,14 @@ gas) against a freshly-installed `sbxperm` network with `allowlist=[0x57f2…]`
   [balance gate](../06-txpool-flooding/README.md#observed).
 - **7b** — allowed. `perm_addAccountsToAllowlist([T])` on all four validators made the
   allowlist `[0x57f2…, 0xe2e0…]`; T's tx then mined (nonce 0 → 1). The change is
-  per-node, so it must be applied on every validator.
+  per-node, and enforced only at submission, not at block import: a node rejects T's tx
+  from its _own_ pool if T isn't on its list, but it still accepts a block containing T's
+  tx mined by another proposer. So T only has to reach one _proposer_ that allowlists it;
+  once mined, the tx is on-chain everywhere, even on nodes that deny T (Besu never
+  re-checks permissioning on block import, so there is no split — [the rule simply doesn't
+  apply to blocks other nodes produce](https://docs.besu-eth.org/private-networks/concepts/permissioning)).
+  Divergent allowlists therefore give inconsistent,
+  entry-point-dependent results — keep the allowlist identical across all validators.
 - **7c** — denied again. `perm_removeAccountsFromAllowlist([T])` on all four → T rejected
   again with the same `-32007`; allowlist back to `[0x57f2…]`.
 - Block production was unaffected throughout; account permissioning gates transaction

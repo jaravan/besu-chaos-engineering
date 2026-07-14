@@ -1,9 +1,9 @@
 # Scenario 08 — Permissioning Outage (allowlist lockout)
 
-The third transaction-layer scenario, and the dark twin of
-[scenario 07](../07-account-permissioning/). There the allowlist works as designed:
-deny → allow → deny a _single_ sender. Here the same mechanism fails open into a
-network-wide lockout: the allowlist loses the operational account and _every_ sender is
+The third transaction-layer scenario, and the same mechanism as
+[scenario 07](../07-account-permissioning/) seen from its failure perspective. There the
+allowlist works as designed: deny → allow → deny a _single_ sender. Here it turns on
+the whole network: the allowlist loses the operational account and _every_ sender is
 rejected with `-32007`, while the chain keeps producing empty blocks and looks
 perfectly healthy.
 

@@ -20,15 +20,16 @@ unsure whether the backup is safe to restore. After a restore, one of:
 Know which backup class you are holding: "snapshot" hides three different consistency
 guarantees, and the recovery odds differ per class:
 
-1. **Cold copy** (node was stopped): quiesced, crash-consistent by construction, always
+1. **Cold copy** (node was stopped): at rest, crash-consistent by construction, always
    reopens.
 2. **Block-level point-in-time snapshot** (cloud volume snapshot, CSI `VolumeSnapshot`):
    crash-consistent, the power-failure image RocksDB's write-ahead log is designed to
    recover.
 3. **File-walk copy of a live directory** (`tar`, `rsync`, restic-style file backup taken
-   while Besu ran): _smeared_, files captured at different instants, possibly an
-   SST/MANIFEST set that never coexisted. Worse than a crash; the class most likely to
-   produce the crash-loop above.
+   while Besu ran): _smeared_ — the copy takes time and Besu keeps writing, so early and
+   late files come from different moments and may not fit together (an index listing data
+   files that compaction already deleted). Worse than a crash, which at least captures one
+   instant; the class most likely to produce the crash-loop above.
 
 This is not a freezer problem. GoQuorum/Geth split chain data between a live DB and a
 separate append-only freezer (ancient store) that can desynchronise in a hot backup.

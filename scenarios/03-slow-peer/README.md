@@ -65,8 +65,12 @@ announcing itself.
 Apply `tc netem` to the target validator's `eth0` (validator4 by default, override
 with `TARGET_VALIDATOR`), via the same privileged ephemeral container used for the
 [partition scenario](../02-network-partition/) (`ensure_netns_container` / `netns` in
-[`scripts/lib.sh`](../../scripts/lib.sh), with `tc` here instead of `iptables`).
-Three escalating steps, each held for `DEGRADE_WINDOW` (default 40s):
+[`scripts/lib.sh`](../../scripts/lib.sh), with `tc` here instead of `iptables`). A
+_qdisc_ (queueing discipline) is just the outbound packet queue on an interface, plus
+the rule for how packets leave it — normally first-in-first-out; `netem` is the rule
+that holds them back to add delay and loss. Attaching it degrades the link; removing
+it restores the interface. Three escalating steps, each held for `DEGRADE_WINDOW`
+(default 40s):
 
 - **3a** — latency: `netem delay 400ms`.
 - **3b** — latency + loss: `netem delay 800ms loss 25%`.
@@ -163,8 +167,13 @@ the runbook diagnosis matches either phrasing.
 ## Variations
 
 - Symmetric (ingress + egress) shaping via an `ifb` redirect, to model a genuinely
-  slow link rather than slow egress only. This should make the node fall behind as a
-  follower, not just as a proposer.
+  slow link rather than slow egress only.
+  - `netem` only shapes an interface's _outbound_ queue, so there's no direct way to
+    delay inbound packets.
+  - The workaround: make an `ifb` (intermediate functional block) virtual device,
+    redirect `eth0`'s ingress onto it, and put `netem` on _its_ egress.
+  - With both directions slowed, blocks now reach the node late too, so it falls behind
+    as a follower and has to catch up — not just missing its own proposer slots.
 - Find the cliff precisely. Sweep `delay`/`loss` upward until the slow node is fully
   excluded, and correlate with `requesttimeoutseconds`: at what point does its proposer
   slot always time out?

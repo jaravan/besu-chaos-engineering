@@ -25,7 +25,7 @@ graph LR
       h1["node writing<br/>file-walk copy"]:::warn --> h2["usually reopens<br/>via WAL recovery"]:::warn
     end
     subgraph s1["STEP 1 — cold"]
-      c1["node stopped<br/>quiesced copy"]:::safe --> c2["crash-consistent<br/>by construction"]:::safe
+      c1["node stopped<br/>at-rest copy"]:::safe --> c2["crash-consistent<br/>by construction"]:::safe
     end
     classDef safe fill:#dfe,stroke:#393,color:#063
     classDef warn fill:#ffd,stroke:#a80,color:#640
@@ -37,7 +37,7 @@ graph LR
 Three claims, in descending order of certainty:
 
 1. A cold snapshot always restores. Stop the node first and the on-disk RocksDB is
-   quiesced, so the copy is crash-consistent _by construction_ and must reopen with zero
+   at rest, so the copy is crash-consistent _by construction_ and must reopen with zero
    recovery and zero errors. This is the procedure to rely on; running it is also a
    restore drill that yields real RTO numbers instead of an untested assumption.
 2. A hot copy of an idle database usually restores. RocksDB keeps a write-ahead log
@@ -98,7 +98,7 @@ distinction of this scenario:
 
 | Backup class                                                                 | Consistency                                      | Verdict                                                                                  |
 | ---------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| **Cold copy** (node stopped)                                                 | Quiesced — perfect                               | Deterministic; the restore source to rely on (STEP 1)                                    |
+| **Cold copy** (node stopped)                                                 | At rest — perfect                                | Deterministic; the restore source to rely on (STEP 1)                                    |
 | **Block-level point-in-time snapshot** (cloud volume / CSI `VolumeSnapshot`) | Crash-consistent — as if the power failed        | What RocksDB's WAL is _designed_ to recover; not injectable on kind (no CSI snapshotter) |
 | **File-walk copy of a live directory** (`tar`, `rsync`, restic)              | _Smeared_ — files captured at different instants | Worse than a crash; the class injected in STEPs 2–3                                      |
 
@@ -119,9 +119,9 @@ hot (`kubectl exec` in the running Besu container, `--warning=no-file-changed`, 
 code recorded, since GNU tar exits 1 if a file changed while being read: a confirmed
 mid-write capture).
 
-- **STEP 1** — cold restore. Scale to 0 (RocksDB quiesced), snapshot, hold `DOWN_WINDOW`
+- **STEP 1** — cold restore. Scale to 0 (RocksDB at rest), snapshot, hold `DOWN_WINDOW`
   (default 20s) so a catch-up gap builds, restore, restart. Held to a hard standard: any
-  DB-error line or failed open fails the scenario, since a quiesced copy has no excuse.
+  DB-error line or failed open fails the scenario, since an at-rest copy has no excuse.
 - **STEP 2** — hot restore, idle. Snapshot inside the running node (no induced load),
   restore, restart. Expected to reopen via WAL recovery.
 - **STEP 3** — hot restore under load. A caster pod (foundry, as in
@@ -170,7 +170,7 @@ each.
 
 | Step                | tar exit(s)  | startup restarts | DB-error lines | Ready after restart | catch-up gap      |
 | ------------------- | ------------ | ---------------- | -------------- | ------------------- | ----------------- |
-| 1 · cold            | — (quiesced) | 0                | **0**          | **21s**             | **0** (6965/6965) |
+| 1 · cold            | — (at rest)  | 0                | **0**          | **21s**             | **0** (6965/6965) |
 | 2 · hot, idle       | 0            | 0                | 0              | **21s**             | **0** (6975/6975) |
 | 3 · hot, under load | 0, 0, 0      | 0                | 0              | **22s**             | **0** (6993/6993) |
 
